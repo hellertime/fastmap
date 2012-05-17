@@ -3,7 +3,6 @@
 
 struct fastmap_datumattr
 {
-	size_t ksize;
 	size_t vsize;
 };
 
@@ -22,13 +21,13 @@ typedef enum
 
 struct fastmap_attr
 {
+	size_t ksize;
 	fastmap_mode_t mode;
 };
 
 struct fastmap
 {
 	struct fastmap_attr attr;
-	char *path;
 	int fd;
 };
 
