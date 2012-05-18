@@ -3,19 +3,36 @@
 #endif
 
 #include <errno.h>
+#include <fcntl.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include <fastmap_types.h>
 #include <fastmap.h>
 
 int fastmap_create(fastmap_t *fm, const fastmap_attr_t *attr, const char *path)
 {
+	int error;
+	fastmap_attr_serialized_t attr_serialized;
+
 	fastmap_attr_copy(&fm->attr, attr);
 
-	if(attr->mode != FASTMAP_WRITE_ONLY)
+	if (attr->mode != FASTMAP_WRITE_ONLY)
 		return EINVAL;
 
-	fm->fd = fastmap_sys_open(path, FASTMAP_SYS_OPEN_WRITE);
+	fm->fd = open(path, O_WRONLY | O_CREAT | O_TRUNC);
+	if (fm->fd == -1)
+		return errno;
+
+	error = fastmap_attr_serialize(&attr_serialized, &fm->attr);
+	if (error != 0)
+		return error;
+
+	error = fastmap_attr_serialized_write(fm->fd, &attr_serialized);
+	if (error != 0)
+		return error;
+
 	return 0;
 }
 
