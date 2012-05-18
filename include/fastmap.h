@@ -11,7 +11,7 @@
 
 typedef struct fastmap fastmap_t;
 typedef struct fastmap_attr fastmap_attr_t;
-typedef struct fastmap_infoattr fastmap_datumattr_t;
+typedef struct fastmap_datumattr fastmap_datumattr_t;
 typedef struct fastmap_datum fastmap_datum_t;
 
 /**
