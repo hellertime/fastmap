@@ -2,6 +2,9 @@
 #include <fastmap_config.h>
 #endif
 
+#include <errno.h>
+#include <string.h>
+
 #include <fastmap_types.h>
 #include <fastmap.h>
 

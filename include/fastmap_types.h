@@ -9,6 +9,8 @@
  *
  */
 
+#include <stdlib.h>
+
 struct fastmap_datumattr
 {
 	size_t vsize;

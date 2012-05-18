@@ -2,6 +2,8 @@
 #include <fastmap_config.h>
 #endif
 
+#include <string.h>
+
 #include <fastmap_types.h>
 #include <fastmap.h>
 
