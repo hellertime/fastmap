@@ -62,7 +62,7 @@ AC_CHECK_SIZEOF(long double)
 AC_CHECK_SIZEOF(void *)
 AC_CHECK_SIZEOF(size_t)
 
-AH_VERBATIM([TG_INTEGER_TYPES],
+AH_VERBATIM([NORMALIZE_SIZED_INTEGERTYPES],
 [/* Get the C99 integer types */
 
 #if defined(HAVE_INTTYPES_H)
@@ -168,8 +168,22 @@ typedef unsigned long long uint64_t;
 AH_VERBATIM([CONFIG_H_CHECK],
 [/* Check that fastmap_config.h is the very first include */
 #if defined(__GLIBC__)
-#error fastmap_config.h was not the very first #include
+#  error fastmap_config.h was not the very first #include
 #endif])
 
+AH_VERBATIM([PORTABLE_BYTE_SWAP_FUNCTIONS],
+[/* Standardize on a byte-swap function naming */
+#if defined(__linux__)
+#  include <endian.h>
+#elif defined(__FreeBSD__) || defined(__NetBSD__)
+#  include <sys/endian.h>
+#elif defined(__OpenBSD__)
+#  include <sys/types.h>
+#  define be16toh(x) betoh16(x)
+#  define be32toh(x) betoh32(x)
+#  define be64toh(x) betoh64(x)
+#else
+#  error No suitable byte-swap routines were found 
+#endif])
 
 AC_OUTPUT([Makefile])

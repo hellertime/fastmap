@@ -26,3 +26,8 @@ int fastmap_attr_copy(fastmap_attr_t *dst, const fastmap_attr_t *src)
 	dst->mode = src->mode;
 	return 0;
 }
+
+int fastmap_attr_serialize(fastmap_attr_serialized_t *sattr, const fastmap_attr_t *attr)
+{
+
+}

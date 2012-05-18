@@ -35,6 +35,15 @@ struct fastmap_attr
 	fastmap_mode_t mode;
 };
 
+#define FASTMAP_ATTR_SERIALIZED_KSIZE_BYTES 8
+#define FASTMAP_ATTR_SERIALIZED_MODE_BYTES 1
+#define FASTMAP_ATTR_SERIALIZED_BYTES 9 /* _KSIZE_BYTES + _MODE_BYTES */
+
+struct fastmap_attr_serialized
+{
+	char buffer[FASTMAP_ATTR_SERIALIZED_BYTES];
+};
+
 struct fastmap
 {
 	struct fastmap_attr attr;

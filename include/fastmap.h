@@ -11,6 +11,7 @@
 
 typedef struct fastmap fastmap_t;
 typedef struct fastmap_attr fastmap_attr_t;
+typedef struct fastmap_attr_serialized fastmap_attr_serialized_t;
 typedef struct fastmap_datumattr fastmap_datumattr_t;
 typedef struct fastmap_datum fastmap_datum_t;
 
@@ -39,6 +40,22 @@ int fastmap_attr_destroy(fastmap_attr_t *attr);
  * @param[out] dst destination 'fastmap_attr_t' to copy to
  */
 int fastmap_attr_copy(fastmap_attr_t *dst, const fastmap_attr_t *src);
+
+/**
+ * Serialized a 'fastmap_attr_t' object
+ *
+ * @param[in]  attr 'fastmap_attr_t' object to serialize
+ * @param[out] sattr 'fastmap_attr_serialized_t' object being serialized into
+ */
+int fastmap_attr_serialize(fastmap_attr_serialized_t *sattr, const fastmap_attr_t *attr);
+
+/**
+ * Deserialize a 'fastmap_attr_serialized_t' object
+ *
+ * @param[in]  sattr 'fastmap_attr_serialized_t' object to deserialize
+ * @param[out] attr 'fastmap_attr_t' object to populate
+ */
+int fastmap_attr_deserialize(fastmap_attr_t *attr, const fastmap_attr_serialized_t *sattr);
 
 /**
  * Initialize fastmap datum attributes object
