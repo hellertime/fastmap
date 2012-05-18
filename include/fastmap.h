@@ -38,8 +38,7 @@ int fastmap_attr_destroy(fastmap_attr_t *attr);
  * @param[in]  src source 'fastmap_attr_t' to copy from
  * @param[out] dst destination 'fastmap_attr_t' to copy to
  */
-int fastmap_attr_copy(fastmap_attr_t *dst, fastmap_attr_t *src);
-
+int fastmap_attr_copy(fastmap_attr_t *dst, const fastmap_attr_t *src);
 
 /**
  * Initialize fastmap datum attributes object
@@ -65,7 +64,7 @@ int fastmap_datumattr_destroy(fastmap_datumattr_t *datumattr);
  * @param[in]  src source 'fastmap_datumattr_t' to copy from
  * @param[out] dst destination 'fastmap_datumattr_t' to copy to
  */
-int fastmap_datumattr_copy(fastmap_datumattr_t *dst, fastmap_datumattr_t *src);
+int fastmap_datumattr_copy(fastmap_datumattr_t *dst, const fastmap_datumattr_t *src);
 
 /**
  * Initialize fastmap datum object

@@ -20,7 +20,7 @@ int fastmap_attr_destroy(fastmap_attr_t *attr)
 	return 0;
 }
 
-int fastmap_attr_copy(fastmap_attr_t *dst, fastmap_attr_t *src)
+int fastmap_attr_copy(fastmap_attr_t *dst, const fastmap_attr_t *src)
 {
 	dst->ksize = src->ksize;
 	dst->mode = src->mode;

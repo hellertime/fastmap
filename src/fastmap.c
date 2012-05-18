@@ -10,7 +10,7 @@
 
 int fastmap_create(fastmap_t *fm, const fastmap_attr_t *attr, const char *path)
 {
-	fastmap_attr_copy(fm->attr, attr);
+	fastmap_attr_copy(&fm->attr, attr);
 
 	if(attr->mode != FASTMAP_WRITE_ONLY)
 		return EINVAL;
