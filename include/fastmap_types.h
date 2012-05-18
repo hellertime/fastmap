@@ -1,6 +1,14 @@
 #ifndef FASTMAP_TYPES_H
 #define FASTMAP_TYPES_H 1
 
+/**
+ * @file   fastmap_types.h
+ * @Author Chris Heller (hellertime@gmail.com)
+ * @date   May, 2012
+ * @brief  Fastmap key-value index file
+ *
+ */
+
 struct fastmap_datumattr
 {
 	size_t vsize;
