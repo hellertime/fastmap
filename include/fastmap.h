@@ -33,6 +33,15 @@ int fastmap_attr_init(fastmap_attr_t *attr);
 int fastmap_attr_destroy(fastmap_attr_t *attr);
 
 /**
+ * Copy the fields of 'fastmap_attr_t' 'src' to 'dst'
+ *
+ * @param[in]  src source 'fastmap_attr_t' to copy from
+ * @param[out] dst destination 'fastmap_attr_t' to copy to
+ */
+int fastmap_attr_copy(fastmap_attr_t *dst, fastmap_attr_t *src);
+
+
+/**
  * Initialize fastmap datum attributes object
  *
  * Calling 'fastmap_datumattr_init' on a previously initialized 'fastmap_datumattr_t' is undefined
@@ -49,6 +58,14 @@ int fastmap_datumattr_init(fastmap_datumattr_t *datumattr);
  * @param[in] datumattr a previously initialized 'fastmap_datumattr_t'
  */
 int fastmap_datumattr_destroy(fastmap_datumattr_t *datumattr);
+
+/**
+ * Copy the fields of 'fastmap_datumattr_t' 'src' to 'dst'
+ *
+ * @param[in]  src source 'fastmap_datumattr_t' to copy from
+ * @param[out] dst destination 'fastmap_datumattr_t' to copy to
+ */
+int fastmap_datumattr_copy(fastmap_datumattr_t *dst, fastmap_datumattr_t *src);
 
 /**
  * Initialize fastmap datum object

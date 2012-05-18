@@ -14,4 +14,11 @@ int fastmap_datumattr_init(fastmap_datumattr_t *datumattr)
 int fastmap_datumattr_destroy(fastmap_datumattr_t *datumattr)
 {
 	memset(datumattr, 0, sizeof(struct fastmap_datumattr));
+	return 0;
+}
+
+int fastmap_datumattr_copy(fastmap_datumattr_t *dst, fastmap_datumattr_t *src)
+{
+	dst->vsize = src->vsize;
+	return 0;
 }
