@@ -15,8 +15,6 @@ AC_CONFIG_SRCDIR([include/fastmap.h])
 # Check for programs
 AC_PROG_CC
 
-AC_PROG_LIBTOOL
-
 # Check for system features
 AC_C_BIGENDIAN
 AC_SYS_LARGEFILE
@@ -30,5 +28,10 @@ AM_INIT_AUTOMAKE([-Wall -Werror subdir-objects])
 
 # *Required when using subdir-objects* 
 AM_PROG_CC_C_O
+
+# *Required when using -Werror*
+AM_PROG_AR
+
+AC_PROG_LIBTOOL
 
 AC_OUTPUT([Makefile])
