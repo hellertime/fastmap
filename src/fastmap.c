@@ -30,8 +30,10 @@ int fastmap_create(fastmap_t *fm, const fastmap_attr_t *attr, const char *path)
 		return error;
 
 	error = fastmap_attr_serialized_write(fm->fd, &attr_serialized);
-	if (error != 0)
-		return error;
+	if (error == -1)
+		return errno;
+
+	/* TODO: Pre-allocate inner pages and map them into memory -- get ready for writing */
 
 	return 0;
 }
@@ -86,7 +88,9 @@ int fastmap_put(fastmap_t *fm, fastmap_datum_t *datum)
 
 int fastmap_put_many(fastmap_t *fm, fastmap_datum_t *data[], size_t how_many)
 {
-	for(size_t i = 0; i < how_many; i++)
+	size_t i;
+
+	for(i = 0; i < how_many; i++)
 	{
 		fastmap_put(fm, data[i]);
 	}
