@@ -38,6 +38,17 @@ int fastmap_create(fastmap_t *fm, const fastmap_attr_t *attr, const char *path)
 
 int fastmap_open(fastmap_t *fm, const char *path)
 {
+	int error;
+	fastmap_attr_serialized_t attr_serialized;
+
+	fm->fd = open(path, O_RDONLY);
+	if (fm->fd == -1)
+		return errno;
+
+	error = fastmap_attr_serialized_read(fm->fd, &attr_serialized);
+	if (error == -1)
+		return errno;
+
 	return fastmap_load(fm, path);
 }
 
