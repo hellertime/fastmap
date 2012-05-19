@@ -58,6 +58,22 @@ int fastmap_attr_serialize(fastmap_attr_serialized_t *sattr, const fastmap_attr_
 int fastmap_attr_deserialize(fastmap_attr_t *attr, const fastmap_attr_serialized_t *sattr);
 
 /**
+ * Read a 'fastmap_attr_serialized_t' object from a file descriptor
+ *
+ * @param[in]  fd the descriptor being read from
+ * @param[out] sattr the 'fastmap_attr_serialized_t' object to populate
+ */
+ssize_t fastmap_attr_serialized_read(int fd, fastmap_attr_serialized_t *sattr);
+
+/**
+ * Write a 'fastmap_attr_serialized_t' object to a file descriptor
+ *
+ * @param[in]  sattr the 'fastmap_attr_serialized_t' object to write
+ * @param[out] fd the descriptor being written to
+ */
+ssize_t fastmap_attr_serialized_write(int, const fastmap_attr_serialized_t *sattr);
+
+/**
  * Initialize fastmap datum attributes object
  *
  * Calling 'fastmap_datumattr_init' on a previously initialized 'fastmap_datumattr_t' is undefined
