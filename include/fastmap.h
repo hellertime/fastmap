@@ -42,6 +42,86 @@ int fastmap_attr_destroy(fastmap_attr_t *attr);
 int fastmap_attr_copy(fastmap_attr_t *dst, const fastmap_attr_t *src);
 
 /**
+ * Set the 'elements' attribute
+ *
+ * @param[in] attr 'fastmap_attr_t' object being updated
+ * @param[in] elements updated 'elements' attribute
+ */
+int fastmap_attr_setelements(fastmap_attr_t *attr, size_t elements);
+
+/**
+ * Get the 'elements' attribute
+ *
+ * @param[in]  attr 'fastmap_attr_t' object being queried
+ * @param[out] elements will be set to the current value
+ */
+int fastmap_attr_getelements(fastmap_attr_t *attr, size_t *elements); 
+
+/**
+ * Set the 'fixedvsize' attribute
+ *
+ * @param[in] attr 'fastmap_attr_t' object being updated
+ * @param[in] fixedvsize updated 'fixedvsize' attribute
+ */
+int fastmap_attr_setfixedvsize(fastmap_attr_t *attr, size_t fixedvsize);
+
+/**
+ * Get the 'fixedvsize' attribute
+ *
+ * @param[in]  attr 'fastmap_attr_t' object being queried
+ * @param[out] fixedvsize will be set to the current value
+ */
+int fastmap_attr_getfixedvsize(fastmap_attr_t *attr, size_t *fixedvsize); 
+
+/**
+ * Set the 'ksize' attribute
+ *
+ * @param[in] attr 'fastmap_attr_t' object being updated
+ * @param[in] ksize updated 'ksize' attribute
+ */
+int fastmap_attr_setksize(fastmap_attr_t *attr, size_t ksize);
+
+/**
+ * Get the 'ksize' attribute
+ *
+ * @param[in]  attr 'fastmap_attr_t' object being queried
+ * @param[out] ksize will be set to the current value
+ */
+int fastmap_attr_getksize(fastmap_attr_t *attr, size_t *ksize); 
+
+/**
+ * Set the 'mode' attribute
+ *
+ * @param[in] attr 'fastmap_attr_t' object being updated
+ * @param[in] mode updated 'mode' attribute
+ */
+int fastmap_attr_setmode(fastmap_attr_t *attr, fastmap_mode_t mode);
+
+/**
+ * Get the 'mode' attribute
+ *
+ * @param[in]  attr 'fastmap_attr_t' object being queried
+ * @param[out] mode will be set to the current value
+ */
+int fastmap_attr_getmode(fastmap_attr_t *attr, fastmap_mode_t *mode); 
+
+/**
+ * Set the 'type' attribute
+ *
+ * @param[in] attr 'fastmap_attr_t' object being updated
+ * @param[in] type updated 'type' attribute
+ */
+int fastmap_attr_settype(fastmap_attr_t *attr, fastmap_type_t type);
+
+/**
+ * Get the 'type' attribute
+ *
+ * @param[in]  attr 'fastmap_attr_t' object being queried
+ * @param[out] type will be set to the current value
+ */
+int fastmap_attr_gettype(fastmap_attr_t *attr, fastmap_type_t *type); 
+
+/**
  * Serialized a 'fastmap_attr_t' object
  *
  * @param[in]  attr 'fastmap_attr_t' object to serialize
