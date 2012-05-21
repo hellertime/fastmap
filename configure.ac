@@ -34,6 +34,7 @@ AM_PROG_AR
 
 AC_PROG_LIBTOOL
 
+# TODO: Add -ffast-math in production, optimizes floor/ceil (since we're only doing integer math)
 CFLAGS="$CFLAGS -Wall -Wextra -Werror -pedantic -Wstrict-aliasing=2 -Wno-missing-field-initializers"
 
 ##
