@@ -63,10 +63,20 @@ struct fastmap_attr_serialized
 	char buffer[FASTMAP_ATTR_SERIALIZED_BYTES];
 };
 
+#define FASTMAP_MAX_LEVELS 32 /* 32 levels allows for over 10^64 elements (assuming 4-byte keys and 4-byte pointers ... plenty of space */
+
 struct fastmap
-{
+{	
+	size_t pagesperlevel[FASTMAP_MAX_LEVELS];
 	struct fastmap_attr attr;
+	size_t branchingfactor;
+	size_t bptrsize;
+	size_t keysperpage;
+	size_t leafnodes;
+	size_t nodelevels;
+	blksize_t blocksize;
 	int fd;
+	int numlevels;
 };
 
 #endif /* ! FASTMAP_TYPES_H */

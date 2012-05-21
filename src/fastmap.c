@@ -11,8 +11,41 @@
 #include <fastmap_types.h>
 #include <fastmap.h>
 
+/**
+ * Computes the keys per page value
+ *
+ * @param[in] fm 'fastmap_t' object parameterizing the keysperpage value
+ *
+ */
+static ssize_t _compute_keysperpage(const fastmap_t *fm)
+{
+	switch (fm->attr->type)
+	{
+	case FASTMAP_TYPE_ATOM:
+		return (fm->blocksize / fm->attr.ksize);
+	case FASTMAP_TYPE_PAIR:
+		return (fm->blocksize / (fm->attr.ksize * 2));
+	case FASTMAP_TYPE_BLOCK:
+	case FASTMAP_TYPE_BLOB:
+		return (fm->blocksize / (fm->bptrsize));
+	default:
+		assert(0 && "Unknown fm->attr->type value");
+	}
+}
+
+/**
+ * Computes the branching factor of the map
+ *
+ * @param[in] fm 'fastmap_t' object parameterizing the branchingfactor
+ */
+static ssize_t _compute_branchingfactor(const fastmap_t *fm)
+{
+	return ((fm->keysperpage + fm->attr.ksize) / (fm->attr.ksize + fm->ptrsize));
+}
+
 int fastmap_create(fastmap_t *fm, const fastmap_attr_t *attr, const char *path)
 {
+	struct stat st;
 	int error;
 	fastmap_attr_serialized_t attr_serialized;
 
@@ -24,6 +57,27 @@ int fastmap_create(fastmap_t *fm, const fastmap_attr_t *attr, const char *path)
 	fm->fd = open(path, O_WRONLY | O_CREAT | O_TRUNC);
 	if (fm->fd == -1)
 		return errno;
+
+	error = fstat(fm->fd, &st);
+	if (error == -1)
+		return errno;
+
+	fm->blocksize = st.st_blksize;
+	fm->keysperpage = _compute_keysperpage(fm);
+	fm->leafnodes = (size_t)ceil((double)fm->attr->elements / (double)fm->keysperpage);
+	fm->branchingfactor = _compute_branchingfactor(fm);
+
+	fm->nodelevels = 0;
+	{
+		size_t levelpages = fm->leafnodes;
+		while (levelpages > 1)
+		{
+			levelpages = (size_t)ceil((double)levelelements / (double)fm->branchingfactor);
+			fm->pagesperlevel[fm->nodelevels++] = levelpages;
+			if (fm->nodelevels > FASTMAP_MAX_LEVELS)
+				return -1; /* TODO: Return FASTMAP_ERROR_TOO_MANY_LEVELS */
+		}
+	}
 
 	error = fastmap_attr_serialize(&attr_serialized, &fm->attr);
 	if (error != 0)
