@@ -73,7 +73,6 @@ struct fastmap
 	size_t bptrsize;
 	size_t keysperpage;
 	size_t leafnodes;
-	size_t nodelevels;
 	blksize_t blocksize;
 	int fd;
 	int numlevels;
