@@ -256,4 +256,50 @@ int fastmap_put(fastmap_t *fm, fastmap_datum_t *datum);
  */
 int fastmap_put_many(fastmap_t *fm, fastmap_datum_t *data[], size_t how_many);
 
+/** Create a fastmap write handle.
+ * This function may allocate memory inside the passed in #fastmap_outhandle_t.
+ * To release this memory and discard the handle, call #fastmap_outhandle_destroy().
+ * @param[out] ohandle An allocated #fastmap_ohandle_t to be initialized
+ * @return A non-zero error value on failure and 0 on success
+ */
+int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *attr, const char *pathname);
+
+/** Close the underlying fastmap and release any allocated memory in the handle.
+ * Calling this function before fully writing all expected elements to the handle
+ * will result in an error, and will discard the underlying fastmap being written.
+ * The handle must not be used again after this call, except in a call to #fastmap_outhandle_init()
+ * @param[in] ohandle A #fastmap_outhandle_t returned by #fastmap_outhandle_init()
+ * @return A non-zero error value on failure and 0 on success. Some possible errors are:
+ * <ul>
+ *   <li> #FASTMAP_EXPECTATION_FAILED - The expectation that all elements would be written
+ *                before calling this function has not been met.</li>
+ * </ul>
+ */
+int fastmap_outhandle_destroy(fastmap_outhandle_t *ohandle);
+
+/** Add an element into a fastmap.
+ * This function stores key/value elements in the map. It is required that keys added
+ * by this function be added in sorted order.
+ * @param[in] ohandle A #fastmap_outhandle_t returned by #fastmap_outhandle_init()
+ * @param[in] element A #fastmap_element_t to add to the map
+ * @return A non-zero error value on failure and 0 on success. Some possible errors are:
+ * <ul>
+ *   <li> #FASTMAP_EXPECTATION_FAILED - The expectation that elements would be written
+ *                in sorted order has not been met.</li>
+ *   <li> EINVAL - An invalid parameter was specified</li>
+ * </ul>
+ */
+int fastmap_outhandle_put(fastmap_outhandle_t *ohandle, const fastmap_element_t *element);
+
+/** Add multiple elements at once into a fastmap.
+ * This function behaves just like calling #fastmap_outhandle_put() multiple times.
+ * @param[in] ohandle A #fastmap_outhandle_t returned by #fastmap_outhandle_init()
+ * @param[in] elements An array of #fastmap_element_t objects to add to the map
+ * @param[in] numelements The size of the 'elements' array
+ * @return A non-zero error value on failure and 0 on sucess. Some possible errors are:
+ * <ul>
+ *   <li> EINVAL - An invalid parameter was specified</li>
+ * </li>
+ */
+int fastmap_outhandle_mput(fastmap_outhandle_t *ohandle, const fastmap_element_t *elements[], size_t numelements);
 #endif /* ! FASTMAP_H */
