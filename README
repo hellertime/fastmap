@@ -223,3 +223,8 @@ main(int argc, char *argv[])
 ## LIMITATIONS
 
 This library is not portable to systems which do not implement mmap(3) (or simmilar).
+
+The fastmap file format is not portable. To remedy this the utility `fastmap2json` is
+provided to produce a portable form which can safely be relocated to another system.
+There is also `json2fastmap` which converts the portable format back into a system
+specific form.
