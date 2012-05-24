@@ -9,257 +9,166 @@
  *
  */
 
-typedef struct fastmap fastmap_t;
-typedef struct fastmap_attr fastmap_attr_t;
-typedef struct fastmap_attr_serialized fastmap_attr_serialized_t;
-typedef struct fastmap_datumattr fastmap_datumattr_t;
-typedef struct fastmap_datum fastmap_datum_t;
+/** Opaque structure used to specify the parameters of a new fastmap */
+typedef struct fastmap_attr_t fastmap_attr_t;
 
-/**
- * Initialize fastmap attributes object
- *
- * Calling 'fastmap_attr_init' on a previously initialized 'fastmap_attr_t' is undefined
- *
- * @param[out] attr a newly initialized 'fastmap_attr_t'
+/** Opaque structure used in writing a fastmap */
+typedef struct fastmap_outhandle_t fastmap_outhandle_t;
+
+/** Opaque structure used in reading a fastmap */
+typedef struct fastmap_inhandle_t fastmap_inhandle_t;
+
+/** Generic structure for passing keys in and out of a #FASTMAP_ATOM formatted fastmap */
+typedef struct fastmap_atom_t
+{
+	void *key;	/**< address of the key data, the size of the key is specified by #fastmap_attr_setksize() */
+} fastmap_atom_t;
+
+/** Generic structure for passing keys and values in and out of a #FASTMAP_PAIR formatted fastmap */
+typedef struct fastmap_pair_t
+{
+	void *key;	/**< address of the key data, the size of the key is specified by #fastmap_attr_setksize() */
+	void *value;	/**< address of the value data, the size of the value is taken to be equal to the size of the key */
+} fastmap_pair_t;
+
+/** Generic structure for passing keys and values in and out of a #FASTMAP_BLOCK formatted fastmap */
+typedef struct fastmap_block_t
+{
+	void *key;	/**< address of the key data, the size of the key is specified by #fastmap_attr_setksize() */
+	void *value;	/**< address of the value data, the size of the value is specified by #fastmap_attr_setvsize() */
+} fastmap_block_t;
+
+/** Generic structure for passing keys and values in and out of a #FASTMAP_BLOB formatted fastmap */
+typedef struct fastmap_blob_t
+{
+	void *key;	/**< address of the key data, the size of the key is specified by #fastmap_attr_setksize() */
+	void *value;	/**< address of the value data */
+	size_t vsize;	/**< sie of the value data */
+} fastmap_blob_t;
+
+/** Union of all element structures. Type is specified by #fastmap_attr_settype() */
+typedef union
+{
+	fastmap_atom_t atom;
+	fastmap_pair_t pair;
+	fastmap_block_t block;
+	fastmap_blob_t blob;
+} fastmap_element_t;
+
+/** Valid formats */
+typedef enum
+{
+	FASTMAP_ATOM,
+	FASTMAP_PAIR,
+	FASTMAP_BLOCK,
+	FASTMAP_BLOB
+} fastmap_format_t;
+
+/** A callback function used to compare elements */
+typedef int (*fastmap_cmpfunc)(const fastmap_format_t format, const fastmap_element_t *a, const fastmap_element_t *b);
+
+/** Initialize a fastmap attribute structure.
+ * This function sets a #fastmap_attr_t to a sane default state.
+ * @param[out] attr An allocated #fastmap_attr_t to be initialized
+ * @return A non-zero error value on failure and 0 on success
  */
 int fastmap_attr_init(fastmap_attr_t *attr);
 
-/**
- * Uninitialize fastmap attributes object
- *
- * A 'fastmap_attr_t' can be re-initialized with 'fastmap_attr_init'
- *
- * @param[in] attr a previously initialized 'fastmap_attr_t'
+/** Destroy a previously initialized attribute structure.
+ * The attribute structure must not be used again util passing it to #fastmap_attr_init()
+ * @param[in] attr A #fastmap_attr_t returned by #fastmap_attr_init()
+ * @return A non-zero error value on failure and 0 on success. Some possible errors are:
+ * <ul>
+ *   <li> EINVAL - An invalid parameter was specified</li>
+ * </ul>
  */
 int fastmap_attr_destroy(fastmap_attr_t *attr);
 
-/**
- * Copy the fields of 'fastmap_attr_t' 'src' to 'dst'
- *
- * @param[in]  src source 'fastmap_attr_t' to copy from
- * @param[out] dst destination 'fastmap_attr_t' to copy to
+/** Set the size of keys in the map
+ * @param[in] attr A #fastmap_attr_t returned by #fastmap_attr_init()
+ * @param[in] size The size of keys
+ * @return A non-zero error value on failure and 0 on success. Some possible errors are:
+ * <ul>
+ *   <li> EINVAL - An invalud parameter was specified</li>
+ * </ul>
  */
-int fastmap_attr_copy(fastmap_attr_t *dst, const fastmap_attr_t *src);
+int fastmap_attr_setksize(fastmap_attr_t *attr, const size_t size);
 
-/**
- * Set the 'elements' attribute
- *
- * @param[in] attr 'fastmap_attr_t' object being updated
- * @param[in] elements updated 'elements' attribute
+/** Get the size of keys in the map
+ * @param[in] attr A #fastmap_attr_t returned by #fastmap_attr_init()
+ * @param[out] size The size of keys
+ * @return A non-zero error value on failure and 0 on success. Some possible errors are:
+ * <ul>
+ *   <li> EINVAL - An invalid parameter was specified</li>
+ * </ul>
  */
-int fastmap_attr_setelements(fastmap_attr_t *attr, size_t elements);
+int fastmap_attr_getksize(fastmap_attr_t *attr, size_t *size);
 
-/**
- * Get the 'elements' attribute
- *
- * @param[in]  attr 'fastmap_attr_t' object being queried
- * @param[out] elements will be set to the current value
+/** Set the size of values in the map
+ * This function has no effect unless the map format is #FASTMAP_BLOCK
+ * @param[in] attr A #fastmap_attr_t returned by #fastmap_attr_init()
+ * @param[in] size The size of values
+ * @return A non-zero error value on failure and 0 on success. Some possible errors are:
+ * <ul>
+ *   <li>EINVAL - An invalid parameter was specified</li>
+ * </ul>
  */
-int fastmap_attr_getelements(fastmap_attr_t *attr, size_t *elements); 
+int fastmap_attr_setvsize(fastmap_attr_t *attr, const size_t size);
 
-/**
- * Set the 'fixedvsize' attribute
- *
- * @param[in] attr 'fastmap_attr_t' object being updated
- * @param[in] fixedvsize updated 'fixedvsize' attribute
+/** Get the size of values in the map
+ * The value returned by this function is undefined unless the map format is #FASTMAP_BLOCK
+ * @param[in] attr A #fastmap_attr_t returned by #fastmap_attr_init()
+ * @param[out] size The size of values
+ * @return A non-zero error value on failure and 0 on success. Some possible errors are:
+ * <ul>
+ *   <li>EINVAL - An invalid parameter was specified</li>
+ * </ul>
  */
-int fastmap_attr_setfixedvsize(fastmap_attr_t *attr, size_t fixedvsize);
 
-/**
- * Get the 'fixedvsize' attribute
- *
- * @param[in]  attr 'fastmap_attr_t' object being queried
- * @param[out] fixedvsize will be set to the current value
+/** Set the map format
+ * @param[in] attr A #fastmap_attr_t returned by #fastmap_attr_init()
+ * @param[in] format The map format
+ * @return A non-zero error value on failure and 0 on success. Some possible errors are:
+ * <ul>
+ *   <li>EINVAL - An invalid parameter was specified</li>
+ * </ul>
  */
-int fastmap_attr_getfixedvsize(fastmap_attr_t *attr, size_t *fixedvsize); 
+int fastmap_attr_setformat(fastmap_attr_t *attr, const fastmap_format_t format);
 
-/**
- * Set the 'ksize' attribute
- *
- * @param[in] attr 'fastmap_attr_t' object being updated
- * @param[in] ksize updated 'ksize' attribute
+/** Get the map format
+ * @param[in] attr A #fastmap_attr_t returned by #fastmap_attr_init()
+ * @param[out] format The map format
+ * @return A non-zero error value on failure and 0 on succes. Some possible errors are:
+ * <ul>
+ *   <li>EINVAL - An invalid parameter was specified</li>
+ * </ul>
  */
-int fastmap_attr_setksize(fastmap_attr_t *attr, size_t ksize);
+int fastmap_attr_getformat(fastmap_attr_t *attr, fastmap_format_t *format);
 
-/**
- * Get the 'ksize' attribute
- *
- * @param[in]  attr 'fastmap_attr_t' object being queried
- * @param[out] ksize will be set to the current value
+/** Set the number of elements in the map
+ * @param[in] attr A #fastmap_attr_t returned by #fastmap_attr_init()
+ * @param[in] nelements The number of elements
+ * @return A non-zero error value on failure and 0 on success. Some possible errors are:
+ * <ul>
+ *   <li>EINVAL - An invalid parameter was specified</li>
+ * </ul>
  */
-int fastmap_attr_getksize(fastmap_attr_t *attr, size_t *ksize); 
+int fastmap_attr_setelements(fastmap_attr_t *attr, const size_t nelements);
 
-/**
- * Set the 'mode' attribute
- *
- * @param[in] attr 'fastmap_attr_t' object being updated
- * @param[in] mode updated 'mode' attribute
+/** Get the number of elements in the map
+ * @param[in] attr A #fastmap_attr_t returned by #fastmap_attr_init()
+ * @param[out] nelements The number of elements
+ * @return A non-zero error value on failure and 0 on success. Some possible errors are:
+ * <ul>
+ *   <li>EINVAL - An invalid parameter was specified</li>
+ * </ul>
  */
-int fastmap_attr_setmode(fastmap_attr_t *attr, fastmap_mode_t mode);
-
-/**
- * Get the 'mode' attribute
- *
- * @param[in]  attr 'fastmap_attr_t' object being queried
- * @param[out] mode will be set to the current value
- */
-int fastmap_attr_getmode(fastmap_attr_t *attr, fastmap_mode_t *mode); 
-
-/**
- * Set the 'type' attribute
- *
- * @param[in] attr 'fastmap_attr_t' object being updated
- * @param[in] type updated 'type' attribute
- */
-int fastmap_attr_settype(fastmap_attr_t *attr, fastmap_type_t type);
-
-/**
- * Get the 'type' attribute
- *
- * @param[in]  attr 'fastmap_attr_t' object being queried
- * @param[out] type will be set to the current value
- */
-int fastmap_attr_gettype(fastmap_attr_t *attr, fastmap_type_t *type); 
-
-/**
- * Serialized a 'fastmap_attr_t' object
- *
- * @param[in]  attr 'fastmap_attr_t' object to serialize
- * @param[out] sattr 'fastmap_attr_serialized_t' object being serialized into
- */
-int fastmap_attr_serialize(fastmap_attr_serialized_t *sattr, const fastmap_attr_t *attr);
-
-/**
- * Deserialize a 'fastmap_attr_serialized_t' object
- *
- * @param[in]  sattr 'fastmap_attr_serialized_t' object to deserialize
- * @param[out] attr 'fastmap_attr_t' object to populate
- */
-int fastmap_attr_deserialize(fastmap_attr_t *attr, const fastmap_attr_serialized_t *sattr);
-
-/**
- * Read a 'fastmap_attr_serialized_t' object from a file descriptor
- *
- * @param[in]  fd the descriptor being read from
- * @param[out] sattr the 'fastmap_attr_serialized_t' object to populate
- */
-ssize_t fastmap_attr_serialized_read(int fd, fastmap_attr_serialized_t *sattr);
-
-/**
- * Write a 'fastmap_attr_serialized_t' object to a file descriptor
- *
- * @param[in]  sattr the 'fastmap_attr_serialized_t' object to write
- * @param[out] fd the descriptor being written to
- */
-ssize_t fastmap_attr_serialized_write(int, const fastmap_attr_serialized_t *sattr);
-
-/**
- * Initialize fastmap datum attributes object
- *
- * Calling 'fastmap_datumattr_init' on a previously initialized 'fastmap_datumattr_t' is undefined
- *
- * @param[out] datumattr a newly initialized 'fastmap_datumattr_t'
- */
-int fastmap_datumattr_init(fastmap_datumattr_t *datumattr);
-
-/**
- * Uninitialize fastmap datum attributes object
- *
- * A 'fastmap_datumattr_t' can be re-initialized with 'fastmap_datumattr_t'
- *
- * @param[in] datumattr a previously initialized 'fastmap_datumattr_t'
- */
-int fastmap_datumattr_destroy(fastmap_datumattr_t *datumattr);
-
-/**
- * Copy the fields of 'fastmap_datumattr_t' 'src' to 'dst'
- *
- * @param[in]  src source 'fastmap_datumattr_t' to copy from
- * @param[out] dst destination 'fastmap_datumattr_t' to copy to
- */
-int fastmap_datumattr_copy(fastmap_datumattr_t *dst, const fastmap_datumattr_t *src);
-
-/**
- * Initialize fastmap datum object
- *
- * Calling 'fastmap_datum_init' on a previously initialized 'fastmap_datum_t' is undefined
- *
- * @param[in]  datumattr an initialized and configured 'fastmap_datumattr_t' to associate with the 'fastmap_datum_t'
- * @param[in]  key the fastmap datum key
- * @param[in]  value the fastmap datum value
- * @param[out] datum an initialized fastmap datum object
- */
-int fastmap_datum_init(fastmap_datum_t *datum, fastmap_datumattr_t *datumattr, void *key, void *value);
-
-/**
- * Uninitialize fastmap datum object
- *
- * A 'fastmap_datum_t' can be re-initialized with 'fastmap_datum_init'
- *
- * @param[in] datum a previously initialized 'fastmap_datum_t'
- */
-int fastmap_datum_destroy(fastmap_datum_t *datum);
-
-/**
- * Create a new writeable fastmap file or rewrite an existing one
- *
- * @param[in]  attr an initialized and configured 'fastmap_attr_t' to associate with the 'fastmap_t'
- * @param[in]  path 
- * @param[out] fm   a handle to the created fastmap
- */
-int fastmap_create(fastmap_t *fm, const fastmap_attr_t *attr, const char *path);
-
-/**
- * Open an existing fastmap for reading
- *
- * @param[in]  path
- * @param[out] fm   a handle to the opend fastmap
- */
-int fastmap_open(fastmap_t *fm, const char *path);
-
-/**
- * Close a fastmap handle
- *
- * @param[in] fm a 'fastmap_t' handle
- */
-int fastmap_close(fastmap_t *fm);
-
-/**
- * Retrieve datum from the fastmap
- *
- * @param[in]  fm
- * @param[out] datum the retrieved datum
- */
-int fastmap_get(fastmap_t *fm, fastmap_datum_t *datum);
-
-/**
- * Retrieve data from the fastmap
- *
- * @param[in]  fm
- * @param[out] data the retrieved data
- */
-int fastmap_get_many(fastmap_t *fm, fastmap_datum_t *data[], size_t how_many);
-
-/**
- * Store datum in the fastmap
- *
- * This must be done in sorted order, otherwise it is an error
- * The 'fastmap_datum_t' object passed to 'fastmap_put' is destroyed
- */
-int fastmap_put(fastmap_t *fm, fastmap_datum_t *datum);
-
-/**
- * Store data in the fastmap
- *
- * The data must be sorted
- * Each 'fastmap_datum_t' object passed to 'fastmap_put_many' is destroyed
- */
-int fastmap_put_many(fastmap_t *fm, fastmap_datum_t *data[], size_t how_many);
+int fastmap_attr_getelements(fastmap_attr_t *attr, size_t *nelements);
 
 /** Create a fastmap write handle.
  * This function may allocate memory inside the passed in #fastmap_outhandle_t.
  * To release this memory and discard the handle, call #fastmap_outhandle_destroy().
- * @param[out] ohandle An allocated #fastmap_ohandle_t to be initialized
+ * @param[out] ohandle An allocated #fastmap_outhandle_t to be initialized
  * @return A non-zero error value on failure and 0 on success
  */
 int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *attr, const char *pathname);
@@ -295,11 +204,71 @@ int fastmap_outhandle_put(fastmap_outhandle_t *ohandle, const fastmap_element_t 
  * This function behaves just like calling #fastmap_outhandle_put() multiple times.
  * @param[in] ohandle A #fastmap_outhandle_t returned by #fastmap_outhandle_init()
  * @param[in] elements An array of #fastmap_element_t objects to add to the map
- * @param[in] numelements The size of the 'elements' array
+ * @param[in] nelements The size of the 'elements' array
  * @return A non-zero error value on failure and 0 on sucess. Some possible errors are:
  * <ul>
+ *   <li> #FASTMAP_EXPECTATION_FAILED - The expectation that elements would be written
+ *                in sorted order has not been met.</li>
  *   <li> EINVAL - An invalid parameter was specified</li>
  * </li>
  */
-int fastmap_outhandle_mput(fastmap_outhandle_t *ohandle, const fastmap_element_t *elements[], size_t numelements);
+int fastmap_outhandle_mput(fastmap_outhandle_t *ohandle, const fastmap_element_t *elements[], size_t nelements);
+
+/** Create a fastmap read handle.
+ * This function may allocate memory inside the passed in #fastmap_inhandle_t.
+ * To release this memory and discard the handle, call #fastmap_inhandle_destroy().
+ * @param[out] ihandle An allocated #fastmap_inhandle_t to be initialized
+ * @return A non-zero error value on failure and 0 on success
+ */
+int fastmap_inhandle_init(fastmap_inhandle_t *ihandle, const char *pathname);
+
+/** Close the underlying fastmap and release any allocated memory in the handle.
+ * The handle must not be used again after this call, except in a call to #fastmap_inhandle_init()
+ * @params[in] ihandle A #fastmap_inhandle_t returned by #fastmap_inhandle_init()
+ * @return A non-zero error value on failure and 0 on success
+ */
+int fastmap_inhandle_destroy(fastmap_inhandle_t *ihandle);
+
+/** Locate an element in a fastmap.
+ * This function locates a value by a key in the map, if the key exists. The 'element'
+ * key field is used to search for the value, and is replaced by a pointer into the map.
+ * This function does not allocate memory, instead returning pointers directly into the map. 
+ * To retain the data, copy it out of the map using #fastmap_element_copy().
+ * @param[in] ihandle A #fastmap_inhandle_t returned by #fastmap_inhandle_init()
+ * @param[in,out] element A #fastmap_element_t used in the search and result
+ * @return A non-zero error value on failure and 0 on success. Some possible errors are:
+ * <ul>
+ *   <li> EINVAL - An invalid parameter was specified</li>
+ *   <li> #FASTMAP_NOT_FOUND - The key was not found in the map</li>
+ * </ul>
+ */
+int fastmap_inhandle_get(fastmap_inhandle_t *ihandle, fastmap_element_t *element);
+
+/** Locate multiple elements at once from a fastmap.
+ * This function behaved just like calling #fastmap_inhandle_get() multiple times.
+ * Rathen than treating a missing key as an error, any input keys that were not 
+ * found will be set to NULL.
+ * @param[in] ihandle A #fastmap_inhandle_t returned by #fastmap_inhandle_init()
+ * @param[in,out] elements An array of #fastmap_element_t object used in the search and result
+ * @param[in] nelements The size of the 'elements' array
+ * @return A non-zero error value on failure and 0 on success. Some possible errors are:
+ * <ul>
+ *  <li> EINVAL - An invalid parameter was specified</li>
+ * </ul>
+ */
+int fastmap_inhandle_mget(fastmap_inhandle_t *ihandle, fastmap_element_t *elements[], size_t nelements);
+
+/** Set a custom comparison function
+ * This function will be called when searching for a key in the map.
+ * If no comparison function is specified, a byte-wise comparison is used, with shorter
+ * items collating before longer ones.
+ * @param[in] ihandle A #fastmap_inhandle_t returned by #fastmap_inhandle_init()
+ * @param[in] cmp A #fastmap_cmpfunc function
+ * @return A non-zero error value on failure and 0 on success. Some possible errors are:
+ * <ul>
+ *   <li>EINVAL - An invalid parameter was specified</li>
+ * </ul>
+ */
+int fastmap_inhandle_setcmpfunc(fastmap_inhandle_t *ihandle, fastmap_cmpfunc *cmp);
+
 #endif /* ! FASTMAP_H */
