@@ -43,15 +43,32 @@ various benefits and trade-offs to the user.
 
 There are four formats supported:
 
-  * `FASTMAP_TYPE_ATOM` this is a degenerate key-value format, where the key is the value.
+  * `FASTMAP_ATOM` this is a degenerate key-value format, where the key is the value.
 
-  * `FASTMAP_TYPE_PAIR` this is a fixed size key-value format, where the key size and
+  * `FASTMAP_PAIR` this is a fixed size key-value format, where the key size and
     the value size are the same, and all keys and values have the same size.
 
-  * `FASTMAP_TYPE_BLOCK` this format has a fixed size key, and a fixed size value, but the
+  * `FASTMAP_BLOCK` this format has a fixed size key, and a fixed size value, but the
     size of the value is not necessarily the same size as the key.
 
-  * `FASTMAP_TYPE_BLOB` this format has a fixed size key, but the value sizes are variable.
+  * `FASTMAP_BLOB` this format has a fixed size key, but the value sizes are variable.
+
+## FILE LAYOUT
+
+A fastmap file is constructed incrementally. Upon initialization a header is written to the
+file at offset 0 with initial values for the fastmap.
+
+Located after the header are branch nodes consisting of a set of key, pointer pairs known
+as search pairs. Branch nodes are grouped into levels such that each level contains enough
+search pairs to be able to point to the start of every branch node in the next level.
+The largest level contains enough search pairs to point to the start of every leaf node.
+
+Located after the branch node levels are the leaf nodes. Depending on the fastmap format the
+leaf nodes will consist of a set of keys, keys and values or keys and pointers. In any case
+these are known as leaf node items.
+
+In the case of a `FASTMAP_BLOB` the pointer will address the starting offset of the leaf node
+value, the first offset will be just after the last leaf node.
 
 ## EXAMPLES
 
