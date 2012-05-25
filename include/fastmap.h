@@ -1,6 +1,3 @@
-#ifndef FASTMAP_H
-#define FASTMAP_H 1
-
 /**
  * @file   fastmap.h
  * @Author Chris Heller (hellertime@gmail.com)
@@ -8,6 +5,8 @@
  * @brief  Fastmap key-value index file
  *
  */
+#ifndef FASTMAP_H
+#define FASTMAP_H 1
 
 /** Opaque structure used to specify the parameters of a new fastmap */
 typedef struct fastmap_attr_t fastmap_attr_t;
@@ -63,6 +62,11 @@ typedef enum
 	FASTMAP_BLOCK,
 	FASTMAP_BLOB
 } fastmap_format_t;
+
+/** Status codes, range -13000 to -13199 */
+#define FASTMAP_OK			0
+#define FASTMAP_NOT_FOUND		-13199
+#define FASTMAP_EXPECTATION_FAILED	-13198
 
 /** A callback function used to compare elements */
 typedef int (*fastmap_cmpfunc)(const fastmap_format_t format, const fastmap_element_t *a, const fastmap_element_t *b);
@@ -233,6 +237,7 @@ int fastmap_inhandle_destroy(fastmap_inhandle_t *ihandle);
  * This function locates a value by a key in the map, if the key exists. The 'element'
  * key field is used to search for the value, and is replaced by a pointer into the map.
  * This function does not allocate memory, instead returning pointers directly into the map. 
+ * The retrieved data will be undefined if #fastmap_outhandle_get() is called again.
  * To retain the data, copy it out of the map using #fastmap_element_copy().
  * @param[in] ihandle A #fastmap_inhandle_t returned by #fastmap_inhandle_init()
  * @param[in,out] element A #fastmap_element_t used in the search and result

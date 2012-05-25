@@ -1,5 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <fastmap_config.h>
+#ifdef HAVE_CONFIG_H #include <fastmap_config.h>
 #endif
 
 #include <errno.h>
@@ -8,121 +7,173 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include <fastmap_types.h>
 #include <fastmap.h>
 
-/**
- * Write computed values
- *
- * @param[in] fd the descriptor to write
- * @param[in] fm the 'fastmap_t' object being written
- */
-static int _write_header(int fd, const fastmap_t *fm)
+struct fastmap_attr_t
 {
-	fastmap_attr_serialized_t sattr;
-	uint64_t _64;
-	uint32_t _32;
-	int i;
+	size_t elements;
+	size_t ksize;
+	size_t vsize;
+	fastmap_format_t format;
+};
 
-	_32 = (uint32_t)htobe32((uint32_t)fm->blocksize);
-	write(fd, &_32, sizeof(_32));
+#define FASTMAP_MAXLEVELS 32 /* 32 levels allows for 10^64 elements (assuming 8-byte keys and 8-byte pointers), plenty of space */
 
-	_32 = (uint32_t)htobe32((uint32_t)fm->numlevels);
-	write(fd, &_32, sizeof(_32));
+struct fastmap_handle_t
+{
+	uint32_t magic;
+	uint32_t version;
+	size_t pagesperlevel[FASTMAP_MAXLEVELS];
+	fastmap_attr_t attr;
+	size_t branchingfactor;
+	size_t bptrsize;
+	size_t itemsperleafnode;
+	size_t leafnodes;
+	size_t leafnodeitemsize;
+	uint32_t pagesize;
+	int numlevels;
+	uint16_t flags;
+};
 
-	for (i = 0; i < fm->numlevels; i++)
+#define FASTMAP_INLINE_BLOCK	0x01
+
+struct fastmap_outhandle_t
+{
+	fastmap_handle_t handle;
+	struct levelinfo
 	{
-		_64 = (uint64_t)htobe64((uint64_t)fm->pagesperlevel[i]);
-		write(fd, &_64, sizeof(_64));
-	}
+		size_t currentpage;
+		size_t nkeys;
+	}[FASTMAP_MAXLEVELS];
+	int fd;
+};
 
-	_64 = (uint64_t)htobe64((uint64_t)fm->branchingfactor);
-	write(fd, &_64, sizeof(_64));
 
-	_64 = (uint64_t)htobe64((uint64_t)fm->bptrsize);
-	write(fd, &_64, sizeof(_64));
-
-	_64 = (uint64_t)htobe64((uint64_t)fm->keysperpage);
-	write(fd, &_64, sizeof(_64));
-
-	_64 = (uint64_t)htobe64((uint64_t)fm->leafnodes);
-	write(fd, &_64, sizeof(_64))
-
-	fastmap_attr_serialize(&sattr, &fm->attr);
-
-	fastmap_attr_serialized_write(fm->fd, &sattr);
-
-	/* TODO: ERRORS! */
-	return 0;
+int fastmap_attr_init(fastmap_attr_t *attr)
+{
+	return fastmap_attr_destroy(attr);
 }
 
-/**
- * Read computed values
- *
- * @param[in]  fd the descriptor to read
- * @param[out] fm the 'fastmap_t' object which will hold the values read
- */
-static int fastmap_read_header(int fd, fastmap_t *fm)
+int fastmap_attr_destroy(fastmap_attr_t *attr)
 {
-	fastmap_attr_serialized_t sattr;
-	uint64_t _64;
-	uint32_t _32;
-	int i;
+	if (!attr)
+		return EINVAL;
 
-	/* TODO: Verfiy the blocksize, if it doesn't match the current st_blksize something is very wrong! */
-	read(fd, &_32, sizeof(_32));
-	fm->blocksize = (blksize_t)be32toh(_32);
-
-	read(fd, &_32, sizeof(_32));
-	fm->numlevels = (int)be32toh(_32);
-
-	for (i = 0; i < fm->numlevels; i++)
-	{
-		read(fd, &_64, sizeof(_64));
-		fm->pagesperlevel[i] = (size_t)be64toh(_64);
-	}
-
-	read(fd, &_64, sizeof(_64));
-	fm->branchingfactor = (size_t)be64toh(_64);
-
-	read(fd, &_64, sizeof(_64));
-	fm->bptrsize = (size_t)be64toh(_64);
-
-	read(fd, &_64, sizeof(_64));
-	fm->keysperpage = (size_t)be64toh(_64);
-
-	read(fd, &_64, sizeof(_64));
-	fm->leafnodes = (size_t)be64toh(_64);
-
-	fastmap_attr_serialized_read(fd, &sattr);
-
-	fastmap_attr_deserialize(&fm->attr, &sattr);
-
-	/* TODO: ERRORS! */
-	return 0;
+	memset(attr, 0, sizeof(*attr));
+	return FASTMAP_OK;
 }
 
-
-/**
- * Computes the keys per page value
- *
- * @param[in] fm 'fastmap_t' object parameterizing the keysperpage value
- *
- */
-static ssize_t _compute_keysperpage(const fastmap_t *fm)
+int fastmap_attr_setelements(fastmap_attr_t *attr, const size_t nelements)
 {
-	switch (fm->attr->type)
+	attr->elements = nelements;
+	return FASTMAP_OK;
+}
+
+int fastmap_attr_getelements(fastmap_attr_t *attr, size_t *nelements)
+{
+	*nelements = attr->elements;
+	return FASTMAP_OK;
+}
+
+int fastmap_attr_setksize(fastmap_attr_t *attr, const size_t size)
+{
+	attr->ksize = size;
+	return FASTMAP_OK;
+}
+
+int fastmap_attr_getksize(fastmap_attr_t *attr, size_t *size)
+{
+	*size = attr->ksize;
+	return FASTMAP_OK;
+}
+
+int fastmap_attr_setvsize(fastmap_attr_t *attr, const size_t size)
+{
+	attr->vsize = size;
+	return FASTMAP_OK;
+}
+
+int fastmap_attr_getvsize(fastmap_attr_t *attr, size_t *size)
+{
+	*size = attr->vsize;
+	return FASTMAP_OK;
+}
+
+int fastmap_attr_setformat(fastmap_attr_t *attr, const fastmap_format_t format)
+{
+	attr->format = format;
+	return FASTMAP_OK;
+}
+
+int fastmap_attr_getformat(fastmap_attr_t *attr, fastmap_format_t *format)
+{
+	*format = attr->format;
+	return FASTMAP_OK;
+}
+
+int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *attr, const char *pathname)
+{
+	struct stat st;
+	int rc = 0;
+
+	if (!ohandle)
+		return EINVAL;
+
+	memset(ohandle, 0, sizeof(*ohandle));
+	memcpy(ohandle->attr, attr, sizeof(*attr));
+
+	ohandle->fd = open(pathname, O_WRONLY | O_CREAT | O_TRUNC);
+	if (ohandle->fd == -1)
 	{
-	case FASTMAP_TYPE_ATOM:
-		return (fm->blocksize / fm->attr.ksize);
-	case FASTMAP_TYPE_PAIR:
-		return (fm->blocksize / (fm->attr.ksize * 2));
-	case FASTMAP_TYPE_BLOCK:
-	case FASTMAP_TYPE_BLOB:
-		return (fm->blocksize / (fm->bptrsize));
+		rc = errno;
+		goto fail;
+	}
+
+	if (fstat(ohandle->fd, &st) == -1)
+	{
+		rc = errno;
+		goto fail;
+	}
+
+	ohandle->handle->bptrsize = sizeof(st.st_size);
+	ohandle->handle->pagesize = (uint32_t)st.st_blksize;
+
+	switch (ohandle->attr->format)
+	{
+	case FASTMAP_ATOM:
+		ohandle->handle->leafnodeitemsize = ohandle->attr->ksize;
+		break;
+	case FASTMAP_PAIR:
+		ohandle->handle->leafnodeitemsize = ohandle->attr->ksize * 2;
+		break;
+	case FASTMAP_BLOCK:
+		if (((ohandle->attr->vsize + (ohandle->handle->pagesize - 1)) & ~(ohandle->handle->pagesize - 1)) > ohandle->attr->ksize)
+		{
+			ohandle->handle->leafnodeitemsize = ohandle->attr->ksize;
+			ohandle->handle->flags |= FASTMAP_INLINE_BLOCKS;
+		}
+		else
+			ohandle->handle->leafnodeitemsize = ohandle->attr->ksize + ohandle->attr->vsize;
+
+		break;
+	case FASTMAP_BLOB:
+		ohandle->handle->leafnodeitemsize = ohandle->attr->ksize + ohandle->attr->bptrsize;
+		break;
 	default:
-		assert(0 && "Unknown fm->attr->type value");
+		rc = EINVAL;
+		goto fail;
 	}
+
+	ohandle->handle->itemsperleafnode = ohandle->handle->pagesize / ohandle->handle->leafnodeitemsize;
+	ohandle->handle->leafnodes = (size_t)ceil((double)ohandle->attr->elements / (double)ohandle->handle->itemsperleafnode);
+
+	/* TODO: branching factor, can the size of a search pointer be calculated based on the number of leaf nodes */
+	ohandle->handle->branchingfactor = 
+
+fail:
+	close(ohandle->fd);
+success:
+	return rc;
 }
 
 /**
