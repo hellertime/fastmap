@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/mman.h>
 
 #include <fastmap.h>
 
@@ -27,7 +28,7 @@ struct fastmap_handle_t
 	fastmap_attr_t attr;
 	size_t branchingfactor;
 	size_t bptrsize;
-	size_t itemsperleafnode;
+	size_t elementsperleafnode;
 	size_t leafnodes;
 	size_t leafnodeitemsize;
 	uint32_t pagesize;
@@ -40,14 +41,20 @@ struct fastmap_handle_t
 struct fastmap_outhandle_t
 {
 	fastmap_handle_t handle;
-	struct levelinfo
-	{
-		size_t currentpage;
-		size_t nkeys;
-	}[FASTMAP_MAXLEVELS];
+	size_t currentelement;
 	int fd;
 };
 
+struct fastmap_inhandle_t
+{
+	fastmap_handle_t handle;
+	fastmap_cmpfunc cmp;
+	void *mmapaddr;
+	size_t mmaplen;
+	int fd;
+};
+
+static int fastmap_cmpfunc_memcmp(const fastmap_attr_t *attr, const void *a, const void *b);
 
 int fastmap_attr_init(fastmap_attr_t *attr)
 {
@@ -114,9 +121,9 @@ int fastmap_attr_getformat(fastmap_attr_t *attr, fastmap_format_t *format)
 int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *attr, const char *pathname)
 {
 	struct stat st;
-	int rc = 0;
+	int rc = FASTMAP_OK;
 
-	if (!ohandle)
+	if (ohandle == NULL)
 		return EINVAL;
 
 	memset(ohandle, 0, sizeof(*ohandle));
@@ -150,10 +157,12 @@ int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *a
 		if (((ohandle->attr->vsize + (ohandle->handle->pagesize - 1)) & ~(ohandle->handle->pagesize - 1)) > ohandle->attr->ksize)
 		{
 			ohandle->handle->leafnodeitemsize = ohandle->attr->ksize;
-			ohandle->handle->flags |= FASTMAP_INLINE_BLOCKS;
 		}
 		else
+		{
 			ohandle->handle->leafnodeitemsize = ohandle->attr->ksize + ohandle->attr->vsize;
+			ohandle->handle->flags |= FASTMAP_INLINE_BLOCKS;
+		}
 
 		break;
 	case FASTMAP_BLOB:
@@ -164,124 +173,192 @@ int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *a
 		goto fail;
 	}
 
-	ohandle->handle->itemsperleafnode = ohandle->handle->pagesize / ohandle->handle->leafnodeitemsize;
-	ohandle->handle->leafnodes = (size_t)ceil((double)ohandle->attr->elements / (double)ohandle->handle->itemsperleafnode);
+	ohandle->handle->elementsperleafnode = ohandle->handle->pagesize / ohandle->handle->leafnodeitemsize;
+	ohandle->handle->leafnodes = (size_t)ceil((double)ohandle->attr->elements / (double)ohandle->handle->elementsperleafnode);
 
 	/* TODO: branching factor, can the size of a search pointer be calculated based on the number of leaf nodes */
-	ohandle->handle->branchingfactor = 
+	ohandle->handle->branchingfactor = ((ohandle->handle->pagesize + ohandle->attr->ksize) / (ohandle->handle->bptrsize + ohandle->attr->ksize));
 
+	ohandle->handle->numlevels = 0;
+	{
+		size_t pagesperlevel = ohandle->handle->leafnodes;
+		while (pagesperlevel > 1)
+		{
+			pagesperlevel = (size_t)ceil((double)pagesperlevel / (double)ohandle->handle->branchingfactor);
+			ohandle->handle->pagesperlevel[ohandle->handle->numlevels++] = pagesperlevel;
+			if (ohandle->handle->numlevels > FASTMAP_MAXLEVELS)
+			{
+				rc = FASTMAP_TOO_MANY_LEVELS;
+				goto fail;
+			}
+		}
+	}
+
+	/* TODO: flush header page, allocate search pages and leafnode pages -- initialize leftmost search pointer*/
+
+	goto success;
 fail:
-	close(ohandle->fd);
+	if (close(ohandle->fd) == -1 && errno != EBADF)
+		rc = errno;
 success:
 	return rc;
 }
 
-/**
- * Computes the branching factor of the map
- *
- * @param[in] fm 'fastmap_t' object parameterizing the branchingfactor
- */
-static ssize_t _compute_branchingfactor(const fastmap_t *fm)
+int fastmap_outhandle_put(fastmap_outhandle_t *ohandle, const fastmap_element_t *element)
 {
-	return ((fm->keysperpage + fm->attr.ksize) / (fm->attr.ksize + fm->ptrsize));
-}
-
-int fastmap_create(fastmap_t *fm, const fastmap_attr_t *attr, const char *path)
-{
-	struct stat st;
-	int error;
-	fastmap_attr_serialized_t attr_serialized;
-
-	fastmap_attr_copy(&fm->attr, attr);
-
-	if (attr->mode != FASTMAP_WRITE_ONLY)
+	if ((ohandle->currentelement + 1) > ohandle->attr->elements)
 		return EINVAL;
 
-	fm->fd = open(path, O_WRONLY | O_CREAT | O_TRUNC);
-	if (fm->fd == -1)
-		return errno;
+	/* TODO: Write element key, and value (possibly including the value pointer) */
+	ohandle->currentelement++;
 
-	error = fstat(fm->fd, &st);
-	if (error == -1)
-		return errno;
-
-	fm->blocksize = st.st_blksize;
-	fm->keysperpage = _compute_keysperpage(fm);
-	fm->leafnodes = (size_t)ceil((double)fm->attr->elements / (double)fm->keysperpage);
-	fm->branchingfactor = _compute_branchingfactor(fm);
-
-	fm->numlevels = 0;
+	if ((ohandle->currentelement % ohandle->handle->elementsperleafnode) == 0)
 	{
-		size_t levelpages = fm->leafnodes;
-		while (levelpages > 1)
+		size_t i;
+		for (i = 0; i < ohandle->handle->numlevels; i++)
 		{
-			levelpages = (size_t)ceil((double)levelpages / (double)fm->branchingfactor);
-			fm->pagesperlevel[fm->numlevels++] = levelpages;
-			if (fm->numlevels > FASTMAP_MAX_LEVELS)
-				return -1; /* TODO: Return FASTMAP_ERROR_TOO_MANY_LEVELS */
+			if (i)
+			{
+				/* TODO: write out pointer to next search node */
+			}
+			else
+			{
+				/* TODO: write out pointer to next leaf node */
+			}
+
+			if ((++(ohandle->levelinfo[i].numpointers) % ohandle->handle->branchingfactor) != 0)
+				break;
 		}
 	}
 
-	_write_header(fm->fd, &fm);
-
-	/* TODO: Pre-allocate inner pages and map them into memory -- get ready for writing */
-
-	return 0;
+	return FASTMAP_OK;
 }
 
-int fastmap_open(fastmap_t *fm, const char *path)
+int fastmap_inhandle_init(fastmap_inhandle_t *ihandle, const char *pathname)
 {
-	int error;
+	struct stat st;
+	int rc = FASTMAP_OK;
 
-	fm->fd = open(path, O_RDONLY);
-	if (fm->fd == -1)
-		return errno;
+	if (ihandle == NULL)
+		return EINVAL;
 
-	error = _read_header(fm->fd, fm);
-	if (error == -1)
-		return errno;
+	memset(ihandle, 0, sizeof(*ihandle));
 
-	return fastmap_load(fm, path);
-}
-
-int fastmap_close(fastmap_t *fm)
-{
-	fastmap_unload(fm);
-	close(fm->fd);
-	memset(fm, 0, sizeof(struct fastmap));
-	return 0;
-}
-
-int fastmap_get(fastmap_t *fm, fastmap_datum_t *datum)
-{
-	int error = fastmap_seek(fm, datum->key);
-	return fastmap_read(fm, datum);
-}
-
-int fastmap_get_many(fastmap_t *fm, fastmap_datum_t *data[], size_t how_many)
-{
-	size_t i;
-
-	for(i = 0; i < how_many; i++)
+	ihandle->fd = open(pathname, O_RDONLY);
+	if (ihandle->fd == -1)
 	{
-		int error = fastmap_seek(fm, data[i]->key);
-		fastmap_read(fm, data[i]);
+		rc = errno;
+		goto fail;
 	}
 
-	return 0;
-}
-
-int fastmap_put(fastmap_t *fm, fastmap_datum_t *datum)
-{
-	return fastmap_write(fm, datum);
-}
-
-int fastmap_put_many(fastmap_t *fm, fastmap_datum_t *data[], size_t how_many)
-{
-	size_t i;
-
-	for(i = 0; i < how_many; i++)
+	if (fstat(ihandle->fd, &st) == -1)
 	{
-		fastmap_put(fm, data[i]);
+		rc = errno;
+		goto fail;
 	}
+
+	if (sizeof(st.st_size) > sizeof(size_t) && st.st_size > SIZE_MAX)
+	{
+		rc = ENOMEM;
+		goto fail;
+	}
+
+	ihandle->mmaplen = (size_t)st.st_size;
+	ihandle->mmapaddr = mmap(NULL, ihandle->mmaplen, PROT_READ, MAP_SHARED, ihandle->fd, 0);
+	if (ihandle->mmapaddr == MAP_FAILED)
+	{
+		rc = errno;
+		goto fail;
+	}
+	/* TODO: assert version and magic */
+	memcpy(&ihandle->handle, ihandle->mmapaddr, sizeof(ihandle->handle));
+
+	fastmap_inhandle_setcmpfunc(ihandle, fastmap_cmpfunc_memcmp);
+
+	goto success;
+fail:
+	if (close(ihandle->fd) == -1 && errno != EBADF)
+		rc = errno;
+success:
+	return rc;
+}
+
+static int fastmap_cmpfunc_memcmp(const fastmap_attr_t *attr, const void *a, const void *b)
+{
+	return memcmp(a, b, attr->ksize);
+}
+
+int fastmap_inhandle_setcmpfunc(fastmap_inhandle_t *ihandle, fastmap_cmpfunc *cmp)
+{
+	ihandle->cmp = cmp;
+	return FASTMAP_OK;
+}
+
+int fastmap_inhandle_get(fastmap_inhandle_t *ihandle, fastmap_element_t *element)
+{
+	size_t currentkey;
+	size_t offset;
+	int currentlevel;
+
+	currentlevel = 0;
+	offset = ihandle->handle->pagesize + ihandle->handle->bptrsize;
+	while (currentlevel < ihandle->handle->numlevels)
+	{
+		for (currentkey = 0; currentkey < ihandle->handle->branchingfactor; currentkey++)
+		{
+			int ord = ihandle->cmp(ihandle->handle->attr, element->atom->key, (char*)ihandle->mmapaddr + offset);
+			if (ord > 0)
+			{
+				offset += ihandle->handle->attr->ksize + ihandle->handle->bptrsize;
+			}
+			else if (ord < 0)
+			{
+				memcpy(&offset, (char*)ihandle->mmapaddr + (offset - ihandle->handle->bptrsize), ihandle->handle->bptrsize);
+				break;
+			}
+			else
+			{
+				memcpy(&offset, (char*)ihandle->mmapaddr + (offset + ihandle->handle->attr->ksize), ihandle->handle->attr->ksize);
+				break;
+			}
+		}
+		currentlevel++;
+	}
+
+	for (currentkey = 0; currentkey < ihandle->handle->elementsperleafnode; currentkey++)
+	{
+		int ord = ihandle->cmp(ihandle->handle->attr, element->atom->key, (char*)ihandle->mmapaddr + offset);
+
+		if (ord > 0)
+		{
+			offset += ihandle->handle->leafnodeitemsize;
+			continue;
+		}
+		else if (ord == 0)
+		{
+			switch (ihandle->attr->format)
+			{
+			case FASTMAP_PAIR:
+				element->pair->value = (void*)((char*)ihandle->mmapaddr + offset + ihandle->attr->ksize);
+				break;
+			case FASTMAP_BLOCK:
+				if (ihandle->handle->flags & FASTMAP_INLINE_BLOCK)
+					element->block->value = (void*)((char*)ihandle->mmapaddr + offset + ihandle->attr->ksize);
+				else
+					element->block->value = (void*)((char*)ihandle->mmapaddr + ihandle->handle->firstvalueoffset + ((leafnodeindex * ihandle->handle->elementsperleafnode + currentkey) * ihandle->handle->attr->vsize);
+				break;
+			case FASTMAP_BLOB:
+				memcpy(&offset, (char*)ihandle->mmapaddr + offset + ihandle->handle->attr->ksize, sizeof(offset));
+				memcpy(&(element->blob->vsize), (char*)ihandle->mmapaddr + offset, sizeof(element->blob->vsize));
+				element->pair->value = (void*)((char*)ihandle->mmapaddr + sizeof(element->blob->vsize));
+			}
+			return FASTMAP_OK;
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	return FASTMAP_NOT_FOUND;
 }

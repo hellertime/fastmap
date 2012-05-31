@@ -67,9 +67,10 @@ typedef enum
 #define FASTMAP_OK			0
 #define FASTMAP_NOT_FOUND		-13199
 #define FASTMAP_EXPECTATION_FAILED	-13198
+#define FASTMAP_TOO_MANY_LEVELS		-13197
 
 /** A callback function used to compare elements */
-typedef int (*fastmap_cmpfunc)(const fastmap_format_t format, const fastmap_element_t *a, const fastmap_element_t *b);
+typedef int (*fastmap_cmpfunc)(const fastmap_attr_t *attr, const void *a, const void *b);
 
 /** Initialize a fastmap attribute structure.
  * This function sets a #fastmap_attr_t to a sane default state.
@@ -186,6 +187,8 @@ int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *a
  * <ul>
  *   <li> #FASTMAP_EXPECTATION_FAILED - The expectation that all elements would be written
  *                before calling this function has not been met.</li>
+ *   <li> #FASTMAP_TOO_MANY_LEVELS - The number of branch node levels required to build a
+ *                valid fastmap exceeds the value of #FASTMAP_MAXLEVELS.</li>
  * </ul>
  */
 int fastmap_outhandle_destroy(fastmap_outhandle_t *ohandle);
@@ -197,8 +200,6 @@ int fastmap_outhandle_destroy(fastmap_outhandle_t *ohandle);
  * @param[in] element A #fastmap_element_t to add to the map
  * @return A non-zero error value on failure and 0 on success. Some possible errors are:
  * <ul>
- *   <li> #FASTMAP_EXPECTATION_FAILED - The expectation that elements would be written
- *                in sorted order has not been met.</li>
  *   <li> EINVAL - An invalid parameter was specified</li>
  * </ul>
  */
@@ -211,8 +212,6 @@ int fastmap_outhandle_put(fastmap_outhandle_t *ohandle, const fastmap_element_t 
  * @param[in] nelements The size of the 'elements' array
  * @return A non-zero error value on failure and 0 on sucess. Some possible errors are:
  * <ul>
- *   <li> #FASTMAP_EXPECTATION_FAILED - The expectation that elements would be written
- *                in sorted order has not been met.</li>
  *   <li> EINVAL - An invalid parameter was specified</li>
  * </li>
  */
