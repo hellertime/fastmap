@@ -24,7 +24,10 @@ struct fastmap_handle_t
 {
 	uint32_t magic;
 	uint32_t version;
-	size_t pagesperlevel[FASTMAP_MAXLEVELS];
+	struct {
+		size_t firstoffset;
+		size_t pages;
+	} perlevel[FASTMAP_MAXLEVELS];
 	fastmap_attr_t attr;
 	size_t branchingfactor;
 	size_t bptrsize;
@@ -177,20 +180,31 @@ int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *a
 	ohandle->handle->leafnodes = (size_t)ceil((double)ohandle->attr->elements / (double)ohandle->handle->elementsperleafnode);
 
 	/* TODO: branching factor, can the size of a search pointer be calculated based on the number of leaf nodes */
-	ohandle->handle->branchingfactor = ((ohandle->handle->pagesize + ohandle->attr->ksize) / (ohandle->handle->bptrsize + ohandle->attr->ksize));
+	ohandle->handle->branchingfactor = ((ohandle->handle->pagesize + ohandle->attr->ksize) / ohandle->attr->ksize);
 
 	ohandle->handle->numlevels = 0;
 	{
+		size_t leafnodesfirstoffset = ohandle->handle->pagesize;
 		size_t pagesperlevel = ohandle->handle->leafnodes;
+		int i;
 		while (pagesperlevel > 1)
 		{
 			pagesperlevel = (size_t)ceil((double)pagesperlevel / (double)ohandle->handle->branchingfactor);
-			ohandle->handle->pagesperlevel[ohandle->handle->numlevels++] = pagesperlevel;
+			ohandle->handle->perlevel[ohandle->handle->numlevels++].pages = pagesperlevel;
+			leafnodesfirstoffset += pagesperlevel * ohandle->handle->pagesize;
 			if (ohandle->handle->numlevels > FASTMAP_MAXLEVELS)
 			{
 				rc = FASTMAP_TOO_MANY_LEVELS;
 				goto fail;
 			}
+		}
+
+		ohandle->handle->leafnodesfirstoffset = leafnodesfirstoffset;
+
+		for (i = ohandle->handle->numlevels; i > 0; i--)
+		{
+			leafnodesfirstoffset -= ohandle->handle->perlevel[i-1].pages * ohandle->handle->pagesize;
+			ohandle->handle->perlevel[i-1].firstoffset = leafnodesfirstoffset;
 		}
 	}
 
@@ -300,29 +314,45 @@ int fastmap_inhandle_get(fastmap_inhandle_t *ihandle, fastmap_element_t *element
 	size_t offset;
 	int currentlevel;
 
-	currentlevel = 0;
-	offset = ihandle->handle->pagesize + ihandle->handle->bptrsize;
-	while (currentlevel < ihandle->handle->numlevels)
+	currentlevel = ihandle->handle->numlevels;
+	offset = ihandle->handle->pagesize;
+	while (currentlevel > 0)
 	{
 		for (currentkey = 0; currentkey < ihandle->handle->branchingfactor; currentkey++)
 		{
 			int ord = ihandle->cmp(ihandle->handle->attr, element->atom->key, (char*)ihandle->mmapaddr + offset);
 			if (ord > 0)
 			{
-				offset += ihandle->handle->attr->ksize + ihandle->handle->bptrsize;
+				offset += ihandle->handle->attr->ksize;
 			}
 			else if (ord < 0)
 			{
-				memcpy(&offset, (char*)ihandle->mmapaddr + (offset - ihandle->handle->bptrsize), ihandle->handle->bptrsize);
+				if (currentlevel == 1)
+				{
+					offset = ihandle->handle->leafnodesoffset;
+				}
+				else
+				{
+					offset = ihandle->handle->perlevel[currentlevel - 1].firstoffset;
+				}
+				offset += currentkey * ihandle->handle->pagesize;
 				break;
 			}
 			else
 			{
-				memcpy(&offset, (char*)ihandle->mmapaddr + (offset + ihandle->handle->attr->ksize), ihandle->handle->attr->ksize);
+				if (currentlevel == 1)
+				{
+					offset = ihandle->handle->leafnodeoffset;
+				}
+				else
+				{
+					offset = ihandle->handle->perlevel[currentlevel - 1].firstoffset;
+				}
+				offset += (currentkey + 1) * ihandle->handle->pagesize;
 				break;
 			}
 		}
-		currentlevel++;
+		currentlevel--;
 	}
 
 	for (currentkey = 0; currentkey < ihandle->handle->elementsperleafnode; currentkey++)
