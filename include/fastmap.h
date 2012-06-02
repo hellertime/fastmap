@@ -124,6 +124,7 @@ typedef union
 #define FASTMAP_NOT_FOUND		-13199
 #define FASTMAP_EXPECTATION_FAILED	-13198
 #define FASTMAP_TOO_MANY_LEVELS		-13197
+#define FASTMAP_TOO_MANY_ELEMENTS	-13196
 
 /** Initialize a fastmap attribute structure.
  * This function sets a #fastmap_attr_t to a sane default state.
@@ -254,6 +255,7 @@ int fastmap_outhandle_destroy(fastmap_outhandle_t *ohandle);
  * @return A non-zero error value on failure and 0 on success. Some possible errors are:
  * <ul>
  *   <li> EINVAL - An invalid parameter was specified</li>
+ *   <li> #FASTMAP_TOO_MANY_ELEMENTS - This map already contains the maximum number of elements it can hold</li>
  * </ul>
  */
 int fastmap_outhandle_put(fastmap_outhandle_t *ohandle, const fastmap_element_t *element);

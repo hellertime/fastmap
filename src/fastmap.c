@@ -105,7 +105,7 @@ int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *a
 		goto fail;
 	}
 
-	ohandle->handle.bptrsize = sizeof(st.st_size);
+	ohandle->handle.bptrsize = sizeof(ohandle->currentvalueoffset);
 	ohandle->handle.pagesize = (uint32_t)st.st_blksize;
 
 #define IS_MULTIPLE(x,y) (x == ((x / y) * y))
@@ -226,9 +226,8 @@ success:
 int fastmap_outhandle_put(fastmap_outhandle_t *ohandle, const fastmap_element_t *element)
 {
 	if ((ohandle->currentelement + 1) > ohandle->handle.attr.elements)
-		return EINVAL;
+		return FASTMAP_TOO_MANY_ELEMENTS;
 
-	/* TODO: Write element key, and value (possibly including the value pointer) */
 	lseek(ohandle->fd, ohandle->currentleafoffset, SEEK_SET);
 	write(ohandle->fd, element->atom.key, ohandle->handle.attr.ksize);
 	ohandle->currentleafoffset += ohandle->handle.attr.ksize;
@@ -240,6 +239,8 @@ int fastmap_outhandle_put(fastmap_outhandle_t *ohandle, const fastmap_element_t 
 		ohandle->currentleafoffset += ohandle->handle.attr.ksize;
 		break;
 	case FASTMAP_BLOB:
+		write(ohandle->fd, &(ohandle->currentvalueoffset), sizeof(ohandle->currentvalueoffset));
+		ohandle->currentleafoffset += sizeof(ohandle->currentvalueoffset);
 		lseek(ohandle->fd, ohandle->currentvalueoffset, SEEK_SET);
 		write(ohandle->fd, &(element->blob.vsize), sizeof(element->blob.vsize));
 		write(ohandle->fd, element->blob.value, element->blob.vsize);
@@ -437,7 +438,7 @@ int fastmap_inhandle_get(fastmap_inhandle_t *ihandle, fastmap_element_t *element
 			case FASTMAP_BLOB:
 				memcpy(&offset, (char*)ihandle->mmapaddr + offset + ihandle->handle.attr.ksize, sizeof(offset));
 				memcpy(&(element->blob.vsize), (char*)ihandle->mmapaddr + offset, sizeof(element->blob.vsize));
-				element->blob.value = (void*)((char*)ihandle->mmapaddr + sizeof(element->blob.vsize));
+				element->blob.value = (void*)((char*)ihandle->mmapaddr + offset + sizeof(element->blob.vsize));
 			case FASTMAP_ATOM:
 				break;
 			}
