@@ -33,6 +33,8 @@ AM_PROG_AR
 
 AC_PROG_LIBTOOL
 
+CFLAGS="-g -ggdb -O0"
+
 ##
 # Normalize integer types as best as we can
 AC_CHECK_HEADERS(inttypes.h stdint.h)

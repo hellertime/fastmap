@@ -315,6 +315,16 @@ int fastmap_inhandle_get(fastmap_inhandle_t *ihandle, fastmap_element_t *element
  */
 int fastmap_inhandle_mget(fastmap_inhandle_t *ihandle, fastmap_element_t *elements[], size_t nelements);
 
+/** Get the attributes of the fastmap
+ * @param[in] ihandle A #fastmap_inhandle_t returned by #fastmap_inhandle_init()
+ * @param[out] attr A #fastmap_attr_t to be configured with the current attr
+ * @return A non-zero error value on failure and 0 on success. Some possible errors are:
+ * <ul>
+ *   <li> EINVAL - An invalid parameter was specified</li>
+ * </ul>
+ */
+int fastmap_inhandle_getattr(fastmap_inhandle_t *ihandle, fastmap_attr_t *attr);
+
 /** Set a custom comparison function
  * This function will be called when searching for a key in the map.
  * If no comparison function is specified, a byte-wise comparison is used, with shorter

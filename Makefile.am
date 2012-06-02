@@ -19,7 +19,7 @@ check_PROGRAMS =
 include_HEADERS = include/fastmap.h
 
 libtap_a_SOURCES = tap.c tap.h
-libtap_a_CPPFLAGS = -Wall
+libtap_a_CPPFLAGS = $(AM_CFLAGS) -Wall
 
 # makefile fragments
 include src/Rules.mk

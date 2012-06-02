@@ -85,14 +85,14 @@ int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *a
 	struct stat st;
 	int rc = FASTMAP_OK;
 
-	if (ohandle == NULL)
+	if (ohandle == NULL || attr == NULL)
 		return EINVAL;
 
 	memset(ohandle, 0, sizeof(*ohandle));
 	memcpy(&ohandle->handle.attr, attr, sizeof(*attr));
 	ohandle->fd = -1;
 
-	ohandle->fd = open(pathname, O_WRONLY | O_CREAT | O_TRUNC);
+	ohandle->fd = open(pathname, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 	if (ohandle->fd == -1)
 	{
 		rc = errno;
@@ -191,6 +191,34 @@ int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *a
 fail:
 	if (ohandle->fd != -1 && close(ohandle->fd) == -1)
 		rc = errno;
+success:
+	return rc;
+}
+
+int fastmap_outhandle_destroy(fastmap_outhandle_t *ohandle)
+{
+	int rc = FASTMAP_OK;
+
+	if (ohandle == NULL || ohandle->fd == -1)
+		return EINVAL;
+
+	if (!(ohandle->handle.flags & FASTMAP_INVALID_MAP))
+	{
+		rc = EINVAL;
+		goto success;
+	}
+
+	if (ohandle->currentelement != ohandle->handle.attr.elements)
+	{
+		rc = FASTMAP_EXPECTATION_FAILED;
+		goto success;
+	}
+
+	ohandle->handle.flags &= ~FASTMAP_INVALID_MAP;
+	lseek(ohandle->fd, 0L, SEEK_SET);
+	write(ohandle->fd , &(ohandle->handle), sizeof(ohandle->handle));
+	close(ohandle->fd);
+	ohandle->fd = -1;
 success:
 	return rc;
 }
@@ -312,9 +340,31 @@ success:
 	return rc;
 }
 
+int fastmap_inhandle_destroy(fastmap_inhandle_t *ihandle)
+{
+	if (ihandle == NULL || ihandle->fd == -1)
+		return EINVAL;
+
+	if (ihandle->mmapaddr)
+	{
+		munmap(ihandle->mmapaddr, ihandle->mmaplen);
+		ihandle->mmapaddr = NULL;
+	}
+
+	close(ihandle->fd);
+	ihandle->fd = -1;
+	return FASTMAP_OK;
+}
+
 static int fastmap_cmpfunc_memcmp(const fastmap_attr_t *attr, const void *a, const void *b)
 {
 	return memcmp(a, b, attr->ksize);
+}
+
+int fastmap_inhandle_getattr(fastmap_inhandle_t *ihandle, fastmap_attr_t *attr)
+{
+	memcpy(attr, &(ihandle->handle.attr), sizeof(*attr));
+	return FASTMAP_OK;
 }
 
 int fastmap_inhandle_setcmpfunc(fastmap_inhandle_t *ihandle, fastmap_cmpfunc cmp)
