@@ -38,14 +38,19 @@ int main(void)
 	fastmap_attr_setformat(&attr, FASTMAP_ATOM);
 
 	fastmap_outhandle_init(&ohandle, &attr, pathname);
+
+	plan(21);
+
 	for (i = 0; i < (sizeof(atoms) / sizeof(atoms[0])); i++)
 	{
 		fastmap_element_t *element = (fastmap_element_t*)&atoms[i];
 		fastmap_outhandle_put(&ohandle, element);
 	}
-	fastmap_outhandle_destroy(&ohandle);
 
-	plan(20);
+	atom.key = "0006";
+	ok(fastmap_outhandle_put(&ohandle, (fastmap_element_t*)&atom) == FASTMAP_TOO_MANY_ELEMENTS, "fastmap_outhandle_put() == TOO_MANY_ELEMENTS");
+
+	fastmap_outhandle_destroy(&ohandle);
 
 	ok(fastmap_inhandle_init(NULL, pathname) == EINVAL, "fastmap_inhandle_init(NULL)");
 	ok(fastmap_inhandle_init(&ihandle, "") != FASTMAP_OK, "fastmap_inhandle_init(\"\")");
@@ -67,7 +72,7 @@ int main(void)
 	}
 
 	atom.key = "0006";
-	ok(fastmap_inhandle_get(&ihandle, (fastmap_element_t*)&atom) == FASTMAP_NOT_FOUND, "fastmap_inhandle_get(\"0006\")");
+	ok(fastmap_inhandle_get(&ihandle, (fastmap_element_t*)&atom) == FASTMAP_NOT_FOUND, "fastmap_inhandle_get(\"0006\") == NOT_FOUND");
 
 	ok(fastmap_inhandle_destroy(NULL) == EINVAL, "fastmap_inhandle_destroy(NULL)");
 	ok(fastmap_inhandle_destroy(&ihandle) == FASTMAP_OK, "fastmap_inhandle_destroy()");
