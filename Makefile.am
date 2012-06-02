@@ -35,5 +35,7 @@ really-clean: maintainer-clean
 	rmdir $(top_srcdir)/build-aux
 	rm $(top_srcdir)/aclocal.m4
 	rm $(top_srcdir)/configure
+	rmdir $(top_builddir)/src
+	rmdir $(top_builddir)/t
 
 .PHONY: really-clean
