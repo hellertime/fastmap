@@ -16,7 +16,7 @@ TEST =
 check_PROGRAMS =
 
 nobase_include_HEADERS =
-include_HEADERS = include/fasttype.h
+include_HEADERS = include/fastmap.h
 
 # makefile fragments
 include src/Rules.mk
