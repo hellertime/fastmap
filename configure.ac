@@ -1,7 +1,6 @@
 ##
 # libfastmap Autoconf script
-#
-# Author: Chris Heller <hellertime@gmail.com>
+# # Author: Chris Heller <hellertime@gmail.com>
 #
 
 AC_INIT([Fastmap Library],[0.0.1],[hellertime@gmail.com],[libfastmap])
@@ -33,9 +32,6 @@ AM_PROG_CC_C_O
 AM_PROG_AR
 
 AC_PROG_LIBTOOL
-
-# TODO: Add -ffast-math in production, optimizes floor/ceil (since we're only doing integer math)
-CFLAGS="$CFLAGS -Wall -Wextra -Werror -pedantic -Wstrict-aliasing=2 -Wno-missing-field-initializers"
 
 ##
 # Normalize integer types as best as we can

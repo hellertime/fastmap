@@ -11,15 +11,20 @@ ACLOCAL_AMFLAGS = -I m4
 # Makefile fragments will complete these variables
 bin_PROGRAMS =
 lib_LTLIBRARIES =
+noinst_LIBRARIES = libtap.a
 
-TEST =
 check_PROGRAMS =
 
-nobase_include_HEADERS =
 include_HEADERS = include/fastmap.h
+
+libtap_a_SOURCES = tap.c tap.h
+libtap_a_CPPFLAGS = -Wall
 
 # makefile fragments
 include src/Rules.mk
+include t/Rules.mk
+
+TESTS = $(check_PROGRAMS)
 
 really-clean: maintainer-clean
 	find $(top_srcdir) -name \*.in -exec rm {} \;
