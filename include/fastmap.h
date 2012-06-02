@@ -273,6 +273,6 @@ int fastmap_inhandle_mget(fastmap_inhandle_t *ihandle, fastmap_element_t *elemen
  *   <li>EINVAL - An invalid parameter was specified</li>
  * </ul>
  */
-int fastmap_inhandle_setcmpfunc(fastmap_inhandle_t *ihandle, fastmap_cmpfunc *cmp);
+int fastmap_inhandle_setcmpfunc(fastmap_inhandle_t *ihandle, fastmap_cmpfunc cmp);
 
 #endif /* ! FASTMAP_H */
