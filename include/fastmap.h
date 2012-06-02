@@ -8,13 +8,78 @@
 #ifndef FASTMAP_H
 #define FASTMAP_H 1
 
+/** Valid formats */
+typedef enum
+{
+	FASTMAP_ATOM,
+	FASTMAP_PAIR,
+	FASTMAP_BLOCK,
+	FASTMAP_BLOB
+} fastmap_format_t;
+
 /** Opaque structure used to specify the parameters of a new fastmap */
+struct fastmap_attr_t
+{
+	size_t elements;
+	size_t ksize;
+	size_t vsize;
+	fastmap_format_t format;
+};
+
 typedef struct fastmap_attr_t fastmap_attr_t;
 
+/** A callback function used to compare elements */
+typedef int (*fastmap_cmpfunc)(const fastmap_attr_t *attr, const void *a, const void *b);
+
+#define FASTMAP_MAXLEVELS 32 /* 32 levels allows for 10^64 elements (assuming 8-byte keys and 8-byte pointers), plenty of space */
+
+typedef struct fastmap_handle_t
+{
+	uint32_t magic;
+	uint32_t version;
+	struct {
+		size_t firstoffset;
+		size_t pages;
+	} perlevel[FASTMAP_MAXLEVELS];
+	fastmap_attr_t attr;
+	size_t branchingfactor;
+	size_t bptrsize;
+	size_t elementsperleafnode;
+	size_t leafnodes;
+	size_t leafnodeitemsize;
+	size_t firstleafnodeoffset;
+	size_t firstvalueoffset;
+	uint32_t pagesize;
+	int numlevels;
+	uint16_t flags;
+} fastmap_handle_t;
+
 /** Opaque structure used in writing a fastmap */
+struct fastmap_outhandle_t
+{
+	fastmap_handle_t handle;
+	struct {
+		size_t currentkey;
+		size_t currentoffset;
+	} levelinfo[FASTMAP_MAXLEVELS];
+	size_t currentelement;
+	size_t currentleafoffset;
+	size_t currentvalueoffset;
+	int fd;
+};
+
 typedef struct fastmap_outhandle_t fastmap_outhandle_t;
 
 /** Opaque structure used in reading a fastmap */
+struct fastmap_inhandle_t
+{
+	fastmap_handle_t handle;
+	fastmap_cmpfunc cmp;
+	void *mmapaddr;
+	size_t mmaplen;
+	int fd;
+};
+
 typedef struct fastmap_inhandle_t fastmap_inhandle_t;
 
 /** Generic structure for passing keys in and out of a #FASTMAP_ATOM formatted fastmap */
@@ -54,23 +119,11 @@ typedef union
 	fastmap_blob_t blob;
 } fastmap_element_t;
 
-/** Valid formats */
-typedef enum
-{
-	FASTMAP_ATOM,
-	FASTMAP_PAIR,
-	FASTMAP_BLOCK,
-	FASTMAP_BLOB
-} fastmap_format_t;
-
 /** Status codes, range -13000 to -13199 */
 #define FASTMAP_OK			0
 #define FASTMAP_NOT_FOUND		-13199
 #define FASTMAP_EXPECTATION_FAILED	-13198
 #define FASTMAP_TOO_MANY_LEVELS		-13197
-
-/** A callback function used to compare elements */
-typedef int (*fastmap_cmpfunc)(const fastmap_attr_t *attr, const void *a, const void *b);
 
 /** Initialize a fastmap attribute structure.
  * This function sets a #fastmap_attr_t to a sane default state.

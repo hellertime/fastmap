@@ -13,61 +13,8 @@
 
 #include <fastmap.h>
 
-struct fastmap_attr_t
-{
-	size_t elements;
-	size_t ksize;
-	size_t vsize;
-	fastmap_format_t format;
-};
-
-#define FASTMAP_MAXLEVELS 32 /* 32 levels allows for 10^64 elements (assuming 8-byte keys and 8-byte pointers), plenty of space */
-
-typedef struct fastmap_handle_t
-{
-	uint32_t magic;
-	uint32_t version;
-	struct {
-		size_t firstoffset;
-		size_t pages;
-	} perlevel[FASTMAP_MAXLEVELS];
-	fastmap_attr_t attr;
-	size_t branchingfactor;
-	size_t bptrsize;
-	size_t elementsperleafnode;
-	size_t leafnodes;
-	size_t leafnodeitemsize;
-	size_t firstleafnodeoffset;
-	size_t firstvalueoffset;
-	uint32_t pagesize;
-	int numlevels;
-	uint16_t flags;
-} fastmap_handle_t;
-
 #define FASTMAP_INVALID_MAP	0x01
 #define FASTMAP_INLINE_BLOCK	0x02
-
-struct fastmap_outhandle_t
-{
-	fastmap_handle_t handle;
-	struct {
-		size_t currentkey;
-		size_t currentoffset;
-	} levelinfo[FASTMAP_MAXLEVELS];
-	size_t currentelement;
-	size_t currentleafoffset;
-	size_t currentvalueoffset;
-	int fd;
-};
-
-struct fastmap_inhandle_t
-{
-	fastmap_handle_t handle;
-	fastmap_cmpfunc cmp;
-	void *mmapaddr;
-	size_t mmaplen;
-	int fd;
-};
 
 static int fastmap_cmpfunc_memcmp(const fastmap_attr_t *attr, const void *a, const void *b);
 

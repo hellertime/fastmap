@@ -1,4 +1,4 @@
-check_PROGRAMS += t/simple
+check_PROGRAMS += t/fastmap_attr_t
 
-t_simple_SOURCES = t/simple.c
-t_simple_LDADD = libtap.a
+t_fastmap_attr_t_SOURCES = t/fastmap_attr_t.c
+t_fastmap_attr_t_LDADD = libtap.a src/libfastmap.la
