@@ -12,6 +12,7 @@ ACLOCAL_AMFLAGS = -I m4
 bin_PROGRAMS =
 lib_LTLIBRARIES =
 noinst_LIBRARIES = libtap.a
+EXTRA_DIST = t/tap.t
 
 check_PROGRAMS =
 
