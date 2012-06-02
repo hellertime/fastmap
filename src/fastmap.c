@@ -34,17 +34,25 @@ struct fastmap_handle_t
 	size_t elementsperleafnode;
 	size_t leafnodes;
 	size_t leafnodeitemsize;
+	size_t firstvalueoffset;
 	uint32_t pagesize;
 	int numlevels;
 	uint16_t flags;
 };
 
-#define FASTMAP_INLINE_BLOCK	0x01
+#define FASTMAP_INVALID_MAP	0x01
+#define FASTMAP_INLINE_BLOCK	0x02
 
 struct fastmap_outhandle_t
 {
 	fastmap_handle_t handle;
+	struct {
+		size_t currentkey;
+		size_t currentoffset;
+	} levelinfo[FASTMAP_MAXLEVELS];
 	size_t currentelement;
+	size_t currentleafoffset;
+	size_t currentvalueoffset;
 	int fd;
 };
 
@@ -130,7 +138,8 @@ int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *a
 		return EINVAL;
 
 	memset(ohandle, 0, sizeof(*ohandle));
-	memcpy(ohandle->attr, attr, sizeof(*attr));
+	memcpy(ohandle->handle->attr, attr, sizeof(*attr));
+	ohandle->fd = -1;
 
 	ohandle->fd = open(pathname, O_WRONLY | O_CREAT | O_TRUNC);
 	if (ohandle->fd == -1)
@@ -148,39 +157,46 @@ int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *a
 	ohandle->handle->bptrsize = sizeof(st.st_size);
 	ohandle->handle->pagesize = (uint32_t)st.st_blksize;
 
-	switch (ohandle->attr->format)
+#define IS_MULTIPLE(x,y) (x == ((x / y) * y))
+
+	if (!IS_MULTIPLE(ohandle->handle->pagesize, ohandle->handle->attr->ksize))
+	{
+		rc = EINVAL;
+		goto fail;
+	}
+
+	switch (ohandle->handle->attr->format)
 	{
 	case FASTMAP_ATOM:
-		ohandle->handle->leafnodeitemsize = ohandle->attr->ksize;
+		ohandle->handle->leafnodeitemsize = ohandle->handle->attr->ksize;
 		break;
 	case FASTMAP_PAIR:
-		ohandle->handle->leafnodeitemsize = ohandle->attr->ksize * 2;
+		ohandle->handle->leafnodeitemsize = ohandle->handle->attr->ksize * 2;
 		break;
 	case FASTMAP_BLOCK:
-		if (((ohandle->attr->vsize + (ohandle->handle->pagesize - 1)) & ~(ohandle->handle->pagesize - 1)) > ohandle->attr->ksize)
+		if (IS_MULTIPLE(ohandle->handle->pagesize, ohandle->handle->attr->ksize + ohandle->handle->attr->vsize))
 		{
-			ohandle->handle->leafnodeitemsize = ohandle->attr->ksize;
+			ohandle->handle->leafnodeitemsize = ohandle->handle->attr->ksize + ohandle->handle->attr->vsize;
+			ohandle->handle->flags |= FASTMAP_INLINE_BLOCKS;
 		}
 		else
 		{
-			ohandle->handle->leafnodeitemsize = ohandle->attr->ksize + ohandle->attr->vsize;
-			ohandle->handle->flags |= FASTMAP_INLINE_BLOCKS;
+			ohandle->handle->leafnodeitemsize = ohandle->handle->attr->ksize;
 		}
-
 		break;
 	case FASTMAP_BLOB:
-		ohandle->handle->leafnodeitemsize = ohandle->attr->ksize + ohandle->attr->bptrsize;
+		ohandle->handle->leafnodeitemsize = ohandle->handle->attr->ksize + ohandle->handle->bptrsize;
 		break;
 	default:
 		rc = EINVAL;
 		goto fail;
 	}
 
-	ohandle->handle->elementsperleafnode = ohandle->handle->pagesize / ohandle->handle->leafnodeitemsize;
-	ohandle->handle->leafnodes = (size_t)ceil((double)ohandle->attr->elements / (double)ohandle->handle->elementsperleafnode);
+#undef IS_MULTIPLE
 
-	/* TODO: branching factor, can the size of a search pointer be calculated based on the number of leaf nodes */
-	ohandle->handle->branchingfactor = ((ohandle->handle->pagesize + ohandle->attr->ksize) / ohandle->attr->ksize);
+	ohandle->handle->elementsperleafnode = ohandle->handle->pagesize / ohandle->handle->leafnodeitemsize;
+	ohandle->handle->leafnodes = (size_t)ceil((double)ohandle->handle->attr->elements / (double)ohandle->handle->elementsperleafnode);
+	ohandle->handle->branchingfactor = ((ohandle->handle->pagesize + ohandle->handle->attr->ksize) / ohandle->handle->attr->ksize);
 
 	ohandle->handle->numlevels = 0;
 	{
@@ -208,11 +224,21 @@ int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *a
 		}
 	}
 
-	/* TODO: flush header page, allocate search pages and leafnode pages -- initialize leftmost search pointer*/
+	ohandle->currentleafoffset = ohandle->handle->leafnodesfirstoffset;
+
+	if (ohandle->handle->attr->format == FASTMAP_BLOB || (ohandle->handle->attr->format == FASTMAP_BLOCK && !(ohandle->handle->flags & FASTMAP_INLINE_BLOCKS)))
+	{
+		ohandle->handle->firstvalueoffset = ohandle->handle->leafnodesfirstoffet + (ohandle->handle->pagesize * ohandle->handle->leafnodes);
+		ohandle->currentvalueoffset = ohandle->handle->firstvalueoffset;
+	}
+
+	ohandle->handle->flags |= FASTMAP_INVALID_MAP;
+	write(ohandle->fd, &(ohandle->handle), sizeof(ohandle->handle));
+	lseek(ohandle->fd, ohandle->handle->pagesize, SEEK_SET);
 
 	goto success;
 fail:
-	if (close(ohandle->fd) == -1 && errno != EBADF)
+	if (ohandle->fd != -1 && close(ohandle->fd) == -1)
 		rc = errno;
 success:
 	return rc;
@@ -224,25 +250,61 @@ int fastmap_outhandle_put(fastmap_outhandle_t *ohandle, const fastmap_element_t 
 		return EINVAL;
 
 	/* TODO: Write element key, and value (possibly including the value pointer) */
+	lseek(ohandle->fd, ohandle->currentleafoffset, SEEK_SET);
+	write(ohandle->fd, element->key, ohandle->handle->attr->ksize);
+	ohandle->currentleafoffset += ohandle->handle->attr->ksize;
+
+	switch (ohandle->handle->attr->format)
+	{
+	case FASTMAP_PAIR:
+		write(ohandle->fd, element->value, ohandle->handle->attr->ksize);
+		ohandle->currentleafoffset += ohandle->handle->attr->ksize;
+		break;
+	case FASTMAP_BLOB:
+		lseek(ohandle->fd, ohandle->currentvalueoffset, SEEK_SET);
+		write(ohandle->fd, &(element->vsize), sizeof(element->vsize));
+		write(ohandle->fd, element->value, element->vsize);
+		ohandle->currentvalueoffset += sizeof(element->vsize) + element->vsize;
+		break;
+	case FASTMAP_BLOCK:
+		if (ohandle->handle->flags & FASTMAP_INLINE_BLOCKS)
+		{
+			write(ohandle->fd, element->value, ohandle->handle->attr->vsize);
+			ohandle->currentleafoffset += ohandle->handle->attr->vsize;
+		}
+		else
+		{
+			lseek(ohandle->fd, ohandle->currentvalueoffset, SEEK_SET);
+			write(ohandle->fd, element->value, ohandle->handle->attr->vsize);
+			ohandle->currentvalueoffset += ohandle->handle->attr->vsize;
+		}
+	}
+
 	ohandle->currentelement++;
 
 	if ((ohandle->currentelement % ohandle->handle->elementsperleafnode) == 0)
 	{
 		size_t i;
+
+#define ALIGN_TO_NEXT_PAGE(v,p) ((v + (p - 1)) & ~(p - 1))
+
+		ohandle->currentleafoffset = ALIGN_TO_NEXT_PAGE(ohandle->currentleafoffset, ohandle->handle->pagesize);
+
 		for (i = 0; i < ohandle->handle->numlevels; i++)
 		{
-			if (i)
-			{
-				/* TODO: write out pointer to next search node */
-			}
-			else
-			{
-				/* TODO: write out pointer to next leaf node */
-			}
+			lseek(ohandle->fd, ohandle->levelinfo[i].currentoffset, SEEK_SET);
+			write(ohandle->fd, element->key, ohandle->handle->attr->ksize);
+			ohandle->levelinfo[i].currentoffset += ohandle->handle->attr->ksize;
+			ohandle->levelinfo[i].currentkey++;
 
-			if ((++(ohandle->levelinfo[i].numpointers) % ohandle->handle->branchingfactor) != 0)
+			if (ohandle->levelinfo[i].currentkey % (ohandle->handle->branchingfactor - 1) != 0)
 				break;
+
+			ohandle->levelinfo[i].currentoffset = ALIGN_TO_NEXT_PAGE(ohandle->levelinfo[i].currentoffset, ohandle->handle->pagesize);
 		}
+
+#undef ALIGN_TO_NEXT_PAGE
+
 	}
 
 	return FASTMAP_OK;
@@ -311,6 +373,7 @@ int fastmap_inhandle_setcmpfunc(fastmap_inhandle_t *ihandle, fastmap_cmpfunc *cm
 int fastmap_inhandle_get(fastmap_inhandle_t *ihandle, fastmap_element_t *element)
 {
 	size_t currentkey;
+	size_t elementindex;
 	size_t offset;
 	int currentlevel;
 
@@ -325,7 +388,7 @@ int fastmap_inhandle_get(fastmap_inhandle_t *ihandle, fastmap_element_t *element
 			{
 				offset += ihandle->handle->attr->ksize;
 			}
-			else if (ord < 0)
+			else
 			{
 				if (currentlevel == 1)
 				{
@@ -335,25 +398,15 @@ int fastmap_inhandle_get(fastmap_inhandle_t *ihandle, fastmap_element_t *element
 				{
 					offset = ihandle->handle->perlevel[currentlevel - 1].firstoffset;
 				}
-				offset += currentkey * ihandle->handle->pagesize;
-				break;
-			}
-			else
-			{
-				if (currentlevel == 1)
-				{
-					offset = ihandle->handle->leafnodeoffset;
-				}
-				else
-				{
-					offset = ihandle->handle->perlevel[currentlevel - 1].firstoffset;
-				}
-				offset += (currentkey + 1) * ihandle->handle->pagesize;
+
+				offset += ((ord < 0) ? currentkey : (currentkey + 1)) * ihandle->handle->pagesize;
 				break;
 			}
 		}
 		currentlevel--;
 	}
+
+	elementindex = ((offset - ihandle->handle->leafnodeoffset) / ohandle->handle->pagesize) / ohandle->handle->elementsperleafnode;
 
 	for (currentkey = 0; currentkey < ihandle->handle->elementsperleafnode; currentkey++)
 	{
@@ -366,6 +419,7 @@ int fastmap_inhandle_get(fastmap_inhandle_t *ihandle, fastmap_element_t *element
 		}
 		else if (ord == 0)
 		{
+			elementindex += currentkey;
 			switch (ihandle->attr->format)
 			{
 			case FASTMAP_PAIR:
@@ -375,7 +429,7 @@ int fastmap_inhandle_get(fastmap_inhandle_t *ihandle, fastmap_element_t *element
 				if (ihandle->handle->flags & FASTMAP_INLINE_BLOCK)
 					element->block->value = (void*)((char*)ihandle->mmapaddr + offset + ihandle->attr->ksize);
 				else
-					element->block->value = (void*)((char*)ihandle->mmapaddr + ihandle->handle->firstvalueoffset + ((leafnodeindex * ihandle->handle->elementsperleafnode + currentkey) * ihandle->handle->attr->vsize);
+					element->block->value = (void*)((char*)ihandle->mmapaddr + ihandle->handle->firstvalueoffset + (elementindex * ihandle->handle->attr->vsize);
 				break;
 			case FASTMAP_BLOB:
 				memcpy(&offset, (char*)ihandle->mmapaddr + offset + ihandle->handle->attr->ksize, sizeof(offset));
