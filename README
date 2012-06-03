@@ -17,14 +17,14 @@ depends on the user providing a few parameters before inserting any data:
   * The size of each key, keys can be of any size, but all keys must be the same size.
 
   * The type of fastmap to build, which can be any of the valid formats (see [FORMATS][])
-    If the type selected is `FASTMAP_TYPE_BLOCK` the user must also provide the size of
+    If the type selected is `FASTMAP_BLOCK` the user must also provide the size of
     each value.
 
 ### Fastmap function return values
 
-Most fastmap functions return `FASTMAP_ERROR_OK` on success, and an appropriate value of
-type `fastmap_error_t` on failure. A user can obtain a string message for the given error
-with a call to `fastmap_error_strerror(3)`. Note that the fastmap functions do not set
+Most fastmap functions return `FASTMAP_OK` on success, and a non-zero error value
+type `int` on failure. A user can obtain a string message for the given error
+with a call to `fastmap_strerror(3)`. Note that the fastmap functions do not set
 errno.
 
 ### Fastmap thread safety
@@ -72,14 +72,14 @@ value, the first offset will be just after the last leaf node.
 
 ## EXAMPLES
 
-The program below demonstrates the creation of a simple `FASTMAP_TYPE_ATOM` fastmap file.
+The program below demonstrates the creation of a simple `FASTMAP_ATOM` fastmap file.
 
 `#include <errno.h>
 
 #include <fastmap.h>
 
 #define handle_error(err) \
-  do { if (err != FASTMAP_ERROR_OK) { perror(fastmap_error_strerror(err)); exit(EXIT_FAILURE); } } while (0)
+  do { if (err != FASTMAP_OK) { perror(fastmap_strerror(err)); exit(EXIT_FAILURE); } } while (0)
 
 int
 main(int argc, char *argv[])
@@ -99,7 +99,7 @@ main(int argc, char *argv[])
   handle_error( fastmap_attr_init(&attr) );
   handle_error( fastmap_attr_setelements(&attr, 5) );
   handle_error( fastmap_attr_setksize(&attr, 4) );
-  handle_error( fastmap_attr_settype(&attr, FASTMAP_TYPE_ATOM) );
+  handle_error( fastmap_attr_setformat(&attr, FASTMAP_ATOM) );
 
   handle_error( fastmap_outhandle_init(&ohandle, &attr, "./fastmap-atom.map") );
 
@@ -123,7 +123,7 @@ This second program demonstrates reading the fastmap created in the previous exa
 #include <fastmap.h>
 
 #define handle_error(err) \
-  do { if (err != FASTMAP_ERROR_OK) { perror(fastmap_error_strerror(err)); exit(EXIT_FAILURE); } } while (0)
+  do { if (err != FASTMAP_OK) { perror(fastmap_strerror(err)); exit(EXIT_FAILURE); } } while (0)
 
 int
 main(int argc, char *argv[])
@@ -151,7 +151,7 @@ This next example demonstrates creating other fastmap formats.
 #include <fastmap.h>
 
 #define handle_error(err) \
-  do { if (err != FASTMAP_ERROR_OK) { perror(fastmap_error_strerror(err)); exit(EXIT_FAILURE); } } while (0)
+  do { if (err != FASTMAP_OK) { perror(fastmap_strerror(err)); exit(EXIT_FAILURE); } } while (0)
 
 int
 main(int argc, char *argv[])
@@ -191,7 +191,7 @@ main(int argc, char *argv[])
   handle_error( fastmap_attr_init(&attr) );
   handle_error( fastmap_attr_setelements(&attr, 5) );
   handle_error( fastmap_attr_setksize(&attr, 4) );
-  handle_error( fastmap_attr_settype(&attr, FASTMAP_TYPE_PAIR) );
+  handle_error( fastmap_attr_setformat(&attr, FASTMAP_PAIR) );
 
   handle_error( fastmap_outhandle_init(&ohandle, &attr, "./fastmap-pair.map") );
 
@@ -207,8 +207,8 @@ main(int argc, char *argv[])
 
   handle_error( fastmap_attr_setelements(&attr, 5) );
   handle_error( fastmap_attr_setksize(&attr, 4) );
-  handle_error( fastmap_attr_setfixedvsize(&attr, strlen(blocks[0].value)) );
-  handle_error( fastmap_attr_settype(&attr, FASTMAP_TYPE_BLOCK) );
+  handle_error( fastmap_attr_setvsize(&attr, strlen(blocks[0].value)) );
+  handle_error( fastmap_attr_setformat(&attr, FASTMAP_BLOCK) );
 
   handle_error( fastmap_outhandle_init(&ohandle, &attr, "./fastmap-block.map") );
 
@@ -224,7 +224,7 @@ main(int argc, char *argv[])
 
   handle_error( fastmap_attr_setelements(&attr, 5) );
   handle_error( fastmap_attr_setksize(&attr, 4) );
-  handle_error( fastmap_attr_settype(&attr, FASTMAP_TYPE_BLOB) );
+  handle_error( fastmap_attr_setformat(&attr, FASTMAP_BLOB) );
 
   handle_error( fastmap_outhandle_init(&ohandle, &attr, "./fastmap-blob.map") );
 
