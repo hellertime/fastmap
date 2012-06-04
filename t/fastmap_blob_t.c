@@ -27,7 +27,7 @@ int main(void)
 	setvbuf(stdout, NULL, _IONBF, 0);
 
 	fastmap_attr_init(&attr);
-	fastmap_attr_setelements(&attr, 5);
+	fastmap_attr_setrecords(&attr, 5);
 	fastmap_attr_setksize(&attr, 4);
 	fastmap_attr_setvsize(&attr, 5);
 	fastmap_attr_setformat(&attr, FASTMAP_BLOB);
@@ -37,7 +37,7 @@ int main(void)
 	fastmap_outhandle_init(&ohandle, &attr, pathname);
 
 	for (i = 0; i < (sizeof(blobs) / sizeof(blobs[0])); i++)
-		ok(fastmap_outhandle_put(&ohandle, (fastmap_element_t*)&blobs[i]) == FASTMAP_OK, "fastmap_outhandle_put(\"%s\")", blobs[i].key);
+		ok(fastmap_outhandle_put(&ohandle, (fastmap_record_t*)&blobs[i]) == FASTMAP_OK, "fastmap_outhandle_put(\"%s\")", blobs[i].key);
 	fastmap_outhandle_destroy(&ohandle);
 
 	fastmap_inhandle_init(&ihandle, pathname);
@@ -45,7 +45,7 @@ int main(void)
 	for (i = 0; i < (sizeof(blobs) / sizeof(blobs[0])); i++)
 	{
 		blob.key = blobs[i].key;
-		ok(fastmap_inhandle_get(&ihandle, (fastmap_element_t*)&blob) == FASTMAP_OK, "fastmap_inhandle_get(\"%s\")", blob.key);
+		ok(fastmap_inhandle_get(&ihandle, (fastmap_record_t*)&blob) == FASTMAP_OK, "fastmap_inhandle_get(\"%s\")", blob.key);
 		strncpy(buf, blob.value, strlen(blobs[i].value));
 		buf[strlen(blobs[i].value)] = '\0';
 		is(buf, blobs[i].value, "%s == %s", buf, blobs[i].value);

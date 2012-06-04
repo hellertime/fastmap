@@ -27,7 +27,7 @@ int main(void)
 	setvbuf(stdout, NULL, _IONBF, 0);
 
 	fastmap_attr_init(&attr);
-	fastmap_attr_setelements(&attr, 5);
+	fastmap_attr_setrecords(&attr, 5);
 	fastmap_attr_setksize(&attr, 4);
 	fastmap_attr_setvsize(&attr, 8);
 	fastmap_attr_setformat(&attr, FASTMAP_BLOCK);
@@ -39,7 +39,7 @@ int main(void)
 	ok(!(ohandle.handle.flags & 0x02), "INLINE_BLOCK");
 
 	for (i = 0; i < (sizeof(blocks) / sizeof(blocks[0])); i++)
-		ok(fastmap_outhandle_put(&ohandle, (fastmap_element_t*)&blocks[i]) == FASTMAP_OK, "fastmap_outhandle_put(\"%s\")", blocks[i].key);
+		ok(fastmap_outhandle_put(&ohandle, (fastmap_record_t*)&blocks[i]) == FASTMAP_OK, "fastmap_outhandle_put(\"%s\")", blocks[i].key);
 	fastmap_outhandle_destroy(&ohandle);
 
 	fastmap_inhandle_init(&ihandle, pathname);
@@ -49,7 +49,7 @@ int main(void)
 	for (i = 0; i < (sizeof(blocks) / sizeof(blocks[0])); i++)
 	{
 		block.key = blocks[i].key;
-		ok(fastmap_inhandle_get(&ihandle, (fastmap_element_t*)&block) == FASTMAP_OK, "fastmap_inhandle_get(\"%s\")", block.key);
+		ok(fastmap_inhandle_get(&ihandle, (fastmap_record_t*)&block) == FASTMAP_OK, "fastmap_inhandle_get(\"%s\")", block.key);
 		strncpy(buf, block.value, strlen(blocks[i].value));
 		is(buf, blocks[i].value, "%s == %s", buf, blocks[i].value);
 	}	

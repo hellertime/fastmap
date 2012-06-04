@@ -27,7 +27,7 @@ int main(void)
 	setvbuf(stdout, NULL, _IONBF, 0);
 
 	fastmap_attr_init(&attr);
-	fastmap_attr_setelements(&attr, 5);
+	fastmap_attr_setrecords(&attr, 5);
 	fastmap_attr_setksize(&attr, 4);
 	fastmap_attr_setformat(&attr, FASTMAP_PAIR);
 
@@ -35,14 +35,14 @@ int main(void)
 
 	fastmap_outhandle_init(&ohandle, &attr, pathname);
 	for (i = 0; i < (sizeof(pairs) / sizeof(pairs[0])); i++)
-		ok(fastmap_outhandle_put(&ohandle, (fastmap_element_t*)&pairs[i]) == FASTMAP_OK, "fastmap_outhandle_put(\"%s\")", pairs[i].key);
+		ok(fastmap_outhandle_put(&ohandle, (fastmap_record_t*)&pairs[i]) == FASTMAP_OK, "fastmap_outhandle_put(\"%s\")", pairs[i].key);
 	fastmap_outhandle_destroy(&ohandle);
 
 	fastmap_inhandle_init(&ihandle, pathname);
 	for (i = 0; i < (sizeof(pairs) / sizeof(pairs[0])); i++)
 	{
 		pair.key = pairs[i].key;
-		ok(fastmap_inhandle_get(&ihandle, (fastmap_element_t*)&pair) == FASTMAP_OK, "fastmap_inhandle_get(\"%s\")", pair.key);
+		ok(fastmap_inhandle_get(&ihandle, (fastmap_record_t*)&pair) == FASTMAP_OK, "fastmap_inhandle_get(\"%s\")", pair.key);
 		strncpy(buf, pair.value, strlen(pairs[i].value));
 		is(buf, pairs[i].value, "%s == %s", buf, pairs[i].value);
 	}	

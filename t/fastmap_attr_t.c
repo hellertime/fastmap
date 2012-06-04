@@ -19,8 +19,8 @@ int main(void)
 	ok(fastmap_attr_init(&attr) == FASTMAP_OK, "fastmap_attr_init()");
 
 	x = (size_t)rand();
-	ok(fastmap_attr_setelements(&attr, x) == FASTMAP_OK, "fastmap_attr_setelements()");
-	ok(fastmap_attr_getelements(&attr,&y) == FASTMAP_OK && x == y, "fastmap_attr_getelements()");
+	ok(fastmap_attr_setrecords(&attr, x) == FASTMAP_OK, "fastmap_attr_setrecords()");
+	ok(fastmap_attr_getrecords(&attr,&y) == FASTMAP_OK && x == y, "fastmap_attr_getrecords()");
 
 	x = (size_t)rand();
 	ok(fastmap_attr_setksize(&attr, x) == FASTMAP_OK, "fastmap_attr_setksize()");

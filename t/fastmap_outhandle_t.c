@@ -25,7 +25,7 @@ int main(void)
 	setvbuf(stdout, NULL, _IONBF, 0);
 
 	fastmap_attr_init(&attr);
-	fastmap_attr_setelements(&attr, 5);
+	fastmap_attr_setrecords(&attr, 5);
 	fastmap_attr_setksize(&attr, 4);
 	fastmap_attr_setformat(&attr, FASTMAP_ATOM);
 
@@ -38,8 +38,8 @@ int main(void)
 
 	for (i = 0; i < (sizeof(atoms) / sizeof(atoms[0])); i++)
 	{
-		fastmap_element_t *element = (fastmap_element_t*)&atoms[i];
-		ok(fastmap_outhandle_put(&ohandle, element) == FASTMAP_OK, "fastmap_outhandle_put(%s)", atoms[i].key);
+		fastmap_record_t *record = (fastmap_record_t*)&atoms[i];
+		ok(fastmap_outhandle_put(&ohandle, record) == FASTMAP_OK, "fastmap_outhandle_put(%s)", atoms[i].key);
 	}
 
 	ok(fastmap_outhandle_destroy(NULL) == EINVAL, "fastmap_outhandle_destroy(NULL)");

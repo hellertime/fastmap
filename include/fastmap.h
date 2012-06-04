@@ -20,7 +20,7 @@ typedef enum
 /** Opaque structure used to specify the parameters of a new fastmap */
 struct fastmap_attr_t
 {
-	size_t elements;
+	size_t records;
 	size_t ksize;
 	size_t vsize;
 	fastmap_format_t format;
@@ -28,10 +28,10 @@ struct fastmap_attr_t
 
 typedef struct fastmap_attr_t fastmap_attr_t;
 
-/** A callback function used to compare elements */
+/** A callback function used to compare records */
 typedef int (*fastmap_cmpfunc)(const fastmap_attr_t *attr, const void *a, const void *b);
 
-#define FASTMAP_MAXLEVELS 32 /* 32 levels allows for 10^64 elements (assuming 8-byte keys and 8-byte pointers), plenty of space */
+#define FASTMAP_MAXLEVELS 32 /* 32 levels allows for 10^64 records (assuming 8-byte keys and 8-byte pointers), plenty of space */
 
 typedef struct fastmap_handle_t
 {
@@ -43,11 +43,11 @@ typedef struct fastmap_handle_t
 	} perlevel[FASTMAP_MAXLEVELS];
 	fastmap_attr_t attr;
 	size_t branchingfactor;
-	size_t bptrsize;
-	size_t elementsperleafnode;
-	size_t leafnodes;
-	size_t leafnodeitemsize;
-	size_t firstleafnodeoffset;
+	size_t valueptrsize;
+	size_t recordsperleafpage;
+	size_t leafpages;
+	size_t leafpagerecordsize;
+	size_t firstleafpageoffset;
 	size_t firstvalueoffset;
 	uint32_t pagesize;
 	int numlevels;
@@ -62,8 +62,8 @@ struct fastmap_outhandle_t
 		size_t currentkey;
 		size_t currentoffset;
 	} levelinfo[FASTMAP_MAXLEVELS];
-	size_t currentelement;
-	size_t currentleafoffset;
+	size_t currentrecord;
+	size_t currentleafpageoffset;
 	size_t currentvalueoffset;
 	int fd;
 };
@@ -110,21 +110,21 @@ typedef struct fastmap_blob_t
 	size_t vsize;	/**< sie of the value data */
 } fastmap_blob_t;
 
-/** Union of all element structures. Type is specified by #fastmap_attr_settype() */
+/** Union of all record structures. Type is specified by #fastmap_attr_settype() */
 typedef union
 {
 	fastmap_atom_t atom;
 	fastmap_pair_t pair;
 	fastmap_block_t block;
 	fastmap_blob_t blob;
-} fastmap_element_t;
+} fastmap_record_t;
 
 /** Status codes, range -13000 to -13199 */
 #define FASTMAP_OK			0
 #define FASTMAP_NOT_FOUND		-13199
 #define FASTMAP_EXPECTATION_FAILED	-13198
 #define FASTMAP_TOO_MANY_LEVELS		-13197
-#define FASTMAP_TOO_MANY_ELEMENTS	-13196
+#define FASTMAP_TOO_MANY_RECORDS	-13196
 
 /** Initialize a fastmap attribute structure.
  * This function sets a #fastmap_attr_t to a sane default state.
@@ -204,25 +204,25 @@ int fastmap_attr_setformat(fastmap_attr_t *attr, const fastmap_format_t format);
  */
 int fastmap_attr_getformat(fastmap_attr_t *attr, fastmap_format_t *format);
 
-/** Set the number of elements in the map
+/** Set the number of records in the map
  * @param[in] attr A #fastmap_attr_t returned by #fastmap_attr_init()
- * @param[in] nelements The number of elements
+ * @param[in] nrecords The number of records
  * @return A non-zero error value on failure and 0 on success. Some possible errors are:
  * <ul>
  *   <li>EINVAL - An invalid parameter was specified</li>
  * </ul>
  */
-int fastmap_attr_setelements(fastmap_attr_t *attr, const size_t nelements);
+int fastmap_attr_setrecords(fastmap_attr_t *attr, const size_t nrecords);
 
-/** Get the number of elements in the map
+/** Get the number of records in the map
  * @param[in] attr A #fastmap_attr_t returned by #fastmap_attr_init()
- * @param[out] nelements The number of elements
+ * @param[out] nrecords The number of records
  * @return A non-zero error value on failure and 0 on success. Some possible errors are:
  * <ul>
  *   <li>EINVAL - An invalid parameter was specified</li>
  * </ul>
  */
-int fastmap_attr_getelements(fastmap_attr_t *attr, size_t *nelements);
+int fastmap_attr_getrecords(fastmap_attr_t *attr, size_t *nrecords);
 
 /** Create a fastmap write handle.
  * This function may allocate memory inside the passed in #fastmap_outhandle_t.
@@ -233,13 +233,13 @@ int fastmap_attr_getelements(fastmap_attr_t *attr, size_t *nelements);
 int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *attr, const char *pathname);
 
 /** Close the underlying fastmap and release any allocated memory in the handle.
- * Calling this function before fully writing all expected elements to the handle
+ * Calling this function before fully writing all expected records to the handle
  * will result in an error, and will discard the underlying fastmap being written.
  * The handle must not be used again after this call, except in a call to #fastmap_outhandle_init()
  * @param[in] ohandle A #fastmap_outhandle_t returned by #fastmap_outhandle_init()
  * @return A non-zero error value on failure and 0 on success. Some possible errors are:
  * <ul>
- *   <li> #FASTMAP_EXPECTATION_FAILED - The expectation that all elements would be written
+ *   <li> #FASTMAP_EXPECTATION_FAILED - The expectation that all records would be written
  *                before calling this function has not been met.</li>
  *   <li> #FASTMAP_TOO_MANY_LEVELS - The number of branch node levels required to build a
  *                valid fastmap exceeds the value of #FASTMAP_MAXLEVELS.</li>
@@ -247,30 +247,30 @@ int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *a
  */
 int fastmap_outhandle_destroy(fastmap_outhandle_t *ohandle);
 
-/** Add an element into a fastmap.
- * This function stores key/value elements in the map. It is required that keys added
+/** Add an record into a fastmap.
+ * This function stores key/value records in the map. It is required that keys added
  * by this function be added in sorted order.
  * @param[in] ohandle A #fastmap_outhandle_t returned by #fastmap_outhandle_init()
- * @param[in] element A #fastmap_element_t to add to the map
+ * @param[in] record A #fastmap_record_t to add to the map
  * @return A non-zero error value on failure and 0 on success. Some possible errors are:
  * <ul>
  *   <li> EINVAL - An invalid parameter was specified</li>
- *   <li> #FASTMAP_TOO_MANY_ELEMENTS - This map already contains the maximum number of elements it can hold</li>
+ *   <li> #FASTMAP_TOO_MANY_ELEMENTS - This map already contains the maximum number of records it can hold</li>
  * </ul>
  */
-int fastmap_outhandle_put(fastmap_outhandle_t *ohandle, const fastmap_element_t *element);
+int fastmap_outhandle_put(fastmap_outhandle_t *ohandle, const fastmap_record_t *record);
 
-/** Add multiple elements at once into a fastmap.
+/** Add multiple records at once into a fastmap.
  * This function behaves just like calling #fastmap_outhandle_put() multiple times.
  * @param[in] ohandle A #fastmap_outhandle_t returned by #fastmap_outhandle_init()
- * @param[in] elements An array of #fastmap_element_t objects to add to the map
- * @param[in] nelements The size of the 'elements' array
+ * @param[in] records An array of #fastmap_record_t objects to add to the map
+ * @param[in] nrecords The size of the 'records' array
  * @return A non-zero error value on failure and 0 on sucess. Some possible errors are:
  * <ul>
  *   <li> EINVAL - An invalid parameter was specified</li>
  * </li>
  */
-int fastmap_outhandle_mput(fastmap_outhandle_t *ohandle, const fastmap_element_t *elements[], size_t nelements);
+int fastmap_outhandle_mput(fastmap_outhandle_t *ohandle, const fastmap_record_t *records[], size_t nrecords);
 
 /** Create a fastmap read handle.
  * This function may allocate memory inside the passed in #fastmap_inhandle_t.
@@ -287,35 +287,35 @@ int fastmap_inhandle_init(fastmap_inhandle_t *ihandle, const char *pathname);
  */
 int fastmap_inhandle_destroy(fastmap_inhandle_t *ihandle);
 
-/** Locate an element in a fastmap.
- * This function locates a value by a key in the map, if the key exists. The 'element'
+/** Locate an record in a fastmap.
+ * This function locates a value by a key in the map, if the key exists. The 'record'
  * key field is used to search for the value, and is replaced by a pointer into the map.
  * This function does not allocate memory, instead returning pointers directly into the map. 
  * The retrieved data will be undefined if #fastmap_outhandle_get() is called again.
- * To retain the data, copy it out of the map using #fastmap_element_copy().
+ * To retain the data, copy it out of the map using #fastmap_record_copy().
  * @param[in] ihandle A #fastmap_inhandle_t returned by #fastmap_inhandle_init()
- * @param[in,out] element A #fastmap_element_t used in the search and result
+ * @param[in,out] record A #fastmap_record_t used in the search and result
  * @return A non-zero error value on failure and 0 on success. Some possible errors are:
  * <ul>
  *   <li> EINVAL - An invalid parameter was specified</li>
  *   <li> #FASTMAP_NOT_FOUND - The key was not found in the map</li>
  * </ul>
  */
-int fastmap_inhandle_get(fastmap_inhandle_t *ihandle, fastmap_element_t *element);
+int fastmap_inhandle_get(fastmap_inhandle_t *ihandle, fastmap_record_t *record);
 
-/** Locate multiple elements at once from a fastmap.
+/** Locate multiple records at once from a fastmap.
  * This function behaved just like calling #fastmap_inhandle_get() multiple times.
  * Rathen than treating a missing key as an error, any input keys that were not 
  * found will be set to NULL.
  * @param[in] ihandle A #fastmap_inhandle_t returned by #fastmap_inhandle_init()
- * @param[in,out] elements An array of #fastmap_element_t object used in the search and result
- * @param[in] nelements The size of the 'elements' array
+ * @param[in,out] records An array of #fastmap_record_t object used in the search and result
+ * @param[in] nrecords The size of the 'records' array
  * @return A non-zero error value on failure and 0 on success. Some possible errors are:
  * <ul>
  *  <li> EINVAL - An invalid parameter was specified</li>
  * </ul>
  */
-int fastmap_inhandle_mget(fastmap_inhandle_t *ihandle, fastmap_element_t *elements[], size_t nelements);
+int fastmap_inhandle_mget(fastmap_inhandle_t *ihandle, fastmap_record_t *records[], size_t nrecords);
 
 /** Get the attributes of the fastmap
  * @param[in] ihandle A #fastmap_inhandle_t returned by #fastmap_inhandle_init()
