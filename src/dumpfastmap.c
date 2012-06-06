@@ -35,7 +35,8 @@ int main(int argc, char *argv[])
 {
 	fastmap_attr_t attr;
 	fastmap_inhandle_t ihandle;
-	int opt;
+	size_t currentoffset, currentpage, currentkey, offset;
+	int opt, i;
 	char *pathname;
 
 	while (1)
@@ -107,8 +108,55 @@ int main(int argc, char *argv[])
 			puts("        \"format\": null,");
 			break;
 	}
-	puts("        }");
+	puts("        },");
+	fprintf(stdout, "      \"branchingfactor\": %d,\n", ihandle.handle.branchingfactor);
+	fprintf(stdout, "      \"leafpages\": %d,\n", ihandle.handle.leafpages);
+	fprintf(stdout, "      \"leafpagerecordsize\": %d,\n", ihandle.handle.leafpagerecordsize);
+	fprintf(stdout, "      \"recordsperleafpage\": %d,\n", ihandle.handle.recordsperleafpage);
+	fprintf(stdout, "      \"firstleafpageoffset\": %d (%d),\n", ihandle.handle.firstleafpageoffset, ihandle.handle.firstleafpageoffset / ihandle.handle.pagesize);
+	fprintf(stdout, "      \"valueptrsize\": %d,\n", ihandle.handle.valueptrsize);
+	fprintf(stdout, "      \"firstvalueoffset\": %d (%d),\n", ihandle.handle.firstvalueoffset, ihandle.handle.firstvalueoffset / ihandle.handle.pagesize);
+	puts("      \"perlevel\": [");
+	for (i = ihandle.handle.numlevels; i > 0; i--)
+	{
+		fprintf(stdout, "        {\"level\": %d, \"firstoffset\": %d, \"pages\": %d},\n", i, ihandle.handle.perlevel[i - 1].firstoffset, ihandle.handle.perlevel[i - 1].pages);
+	}
+	puts("        ]");
 	puts("      }");
+	puts("    \"levels\":");
+	puts("    {");
+	for (i = ihandle.handle.numlevels; i > 0; i--)
+	{
+		currentoffset = ihandle.handle.perlevel[i - 1].firstoffset;
+		fprintf(stdout, "      %d: [\n", i);
+		for (currentpage = 0; currentpage < ihandle.handle.perlevel[i - 1].pages; currentpage++)
+		{
+			offset = currentoffset;
+			fprintf(stdout, "          { %d: [\n", currentpage);
+			for (currentkey = 0; currentkey < ihandle.handle.branchingfactor; currentkey++)
+			{
+				fprintf(stdout, "{ %d: \"", currentkey + (currentpage * ihandle.handle.branchingfactor));
+				while (currentoffset + ihandle.handle.attr.ksize > offset)
+				{
+					if (isalnum(*(char*)(ihandle.mmapaddr + offset)))
+					{
+						putchar(*(char*)(ihandle.mmapaddr + offset));
+					}
+					else
+					{
+						putchar('.');
+					}
+					offset++;	
+				}
+				currentoffset = offset;
+				fprintf(stdout, "\"},");
+			}
+			puts("          ]}");
+			offset = ((offset + (ihandle.handle.pagesize - 1)) & ~(ihandle.handle.pagesize - 1));
+		}
+		puts("        ],");
+	}
+	puts("    }");
 	puts("  }");
 	puts("}");
 }
