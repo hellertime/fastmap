@@ -108,6 +108,7 @@ int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *a
 	ohandle->handle.valueptrsize = sizeof(ohandle->currentvalueoffset);
 	ohandle->handle.pagesize = (uint32_t)st.st_blksize;
 
+	/* TODO: want to change logic on key eval, no multiple restriction, inline blocks (key + val) * n should fit > 95% of a page, or go non-inline */
 #define IS_MULTIPLE(x,y) (x == ((x / y) * y))
 
 	if (!IS_MULTIPLE(ohandle->handle.pagesize, ohandle->handle.attr.ksize))
@@ -168,11 +169,11 @@ int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *a
 
 		ohandle->handle.firstleafpageoffset = firstleafpageoffset;
 
-		for (i = ohandle->handle.numlevels; i > 0; i--)
+		for (i = 0; i < ohandle->handle.numlevels; i++)
 		{
-			firstleafpageoffset -= ohandle->handle.perlevel[i-1].pages * ohandle->handle.pagesize;
-			ohandle->handle.perlevel[i-1].firstoffset = firstleafpageoffset;
-			ohandle->levelinfo[i-1].currentoffset = firstleafpageoffset;
+			firstleafpageoffset -= ohandle->handle.perlevel[i].pages * ohandle->handle.pagesize;
+			ohandle->handle.perlevel[i].firstoffset = firstleafpageoffset;
+			ohandle->levelinfo[i].currentoffset = firstleafpageoffset;
 		}
 	}
 
