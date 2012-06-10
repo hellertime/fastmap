@@ -21,7 +21,7 @@ fastmap(3) -- library routines for fastmap files
 fastmap_attr_t attr;
 fastmap_outhandle_t out;
 
-fastmap_atom_t atoms[] = { 1, 2, 3, ..., 999999 };
+fastmap_atom_t atoms[] = { 1, 2, 3, /* ... , */ 16631, /* ... , */ 999999 };
 
 fastmap_attr_init(&attr);
 fastmap_attr_setformat(&attr, FASTMAP_ATOM);
@@ -64,6 +64,39 @@ fastmap will be created:
   * The size of a key.
 
   * The fastmap format (see [FORMATS][FORMATS]).
+
+### Functions
+
+* `fastmap_attr_init(fastmap_attr_t *)`
+* `fastmap_outhandle_init(fastmap_outhandle_t *, fastmap_attr_t *, const char *)`
+* `fastmap_inhandle_init(fastmap_inhandle_t *, const char *)`
+
+Use these functions to initialize the fastmap data structures.
+
+* `fastmap_outhandle_put(fastmap_outhandle_t *, fastmap_record_t *)`
+* `fastmap_inhandle_get(fastmap_inhandle_t *, fastmap_record_t *)`
+
+Use these functions to respectively put and get a fastmap record.
+
+* `fastmap_attr_destroy(fastmap_attr_t *)`
+* `fastmap_outhandle_destroy(fastmap_outhandle_t *)`
+* `fastmap_inhandle_destroy(fastmap_inhandle_t *)`
+
+Use these functions to de-initialize fastmap data structures, previously initialized.
+
+* `fastmap_attr_setrecords(fastmap_attr_t *, size_t)`
+* `fastmap_attr_setksize(fastmap_attr_t *, size_t)`
+* `fastmap_attr_setvsize(fastmap_attr_t *, size_t)`
+* `fastmap_attr_setformat(fastmap_attr_t *, fastmap_format_t)`
+
+Use these functions to define the attributes of a fastmap before it is created.
+
+* `fastmap_attr_getrecords(fastmap_attr_t *, size_t *)`
+* `fastmap_attr_getksize(fastmap_attr_t *, size_t *)`
+* `fastmap_attr_getvsize(fastmap_attr_t *, size_t *)`
+* `fastmap_attr_getformat(fastmap_attr_t *, fastmap_format_t *)`
+
+Use these functions to inspect the current values of the various attributes.
 
 ### Fastmap function return values
 
