@@ -77,14 +77,14 @@ int main(int argc, char *argv[])
 	puts("{ \"fastmap\":");
 	puts("  { \"handle\":");
 	puts("     {");
-	fprintf(stdout, "      \"numlevels\": %d,\n", ihandle.handle.numlevels);
-	fprintf(stdout, "      \"pagesize\": %d,\n", ihandle.handle.pagesize);
+	fprintf(stdout, "      \"numlevels\": %zu,\n", ihandle.handle.numlevels);
+	fprintf(stdout, "      \"pagesize\": %u,\n", ihandle.handle.pagesize);
 	puts("      \"attr\":");
 	puts("        {");
-	fprintf(stdout, "        \"records\": %d,\n", ihandle.handle.attr.records);
-	fprintf(stdout, "        \"ksize\": %d,\n", ihandle.handle.attr.ksize);
+	fprintf(stdout, "        \"records\": %zu,\n", ihandle.handle.attr.records);
+	fprintf(stdout, "        \"ksize\": %zu,\n", ihandle.handle.attr.ksize);
 	if (ihandle.handle.attr.format == FASTMAP_BLOCK)
-		fprintf(stdout, "        \"vsize\": %d,\n", ihandle.handle.attr.vsize);
+		fprintf(stdout, "        \"vsize\": %zu,\n", ihandle.handle.attr.vsize);
 	else
 		fprintf(stdout, "        \"vsize\": N/A,\n");
 	switch (ihandle.handle.attr.format)
@@ -109,17 +109,17 @@ int main(int argc, char *argv[])
 			break;
 	}
 	puts("        },");
-	fprintf(stdout, "      \"keyspersearchpage\": %d,\n", ihandle.handle.keyspersearchpage);
-	fprintf(stdout, "      \"leafpages\": %d,\n", ihandle.handle.leafpages);
-	fprintf(stdout, "      \"leafpagerecordsize\": %d,\n", ihandle.handle.leafpagerecordsize);
-	fprintf(stdout, "      \"recordsperleafpage\": %d,\n", ihandle.handle.recordsperleafpage);
-	fprintf(stdout, "      \"firstleafpageoffset\": %d (%d),\n", ihandle.handle.firstleafpageoffset, ihandle.handle.firstleafpageoffset / ihandle.handle.pagesize);
-	fprintf(stdout, "      \"valueptrsize\": %d,\n", ihandle.handle.valueptrsize);
-	fprintf(stdout, "      \"firstvalueoffset\": %d (%d),\n", ihandle.handle.firstvalueoffset, ihandle.handle.firstvalueoffset / ihandle.handle.pagesize);
+	fprintf(stdout, "      \"keyspersearchpage\": %zu,\n", ihandle.handle.keyspersearchpage);
+	fprintf(stdout, "      \"leafpages\": %zu,\n", ihandle.handle.leafpages);
+	fprintf(stdout, "      \"leafpagerecordsize\": %zu,\n", ihandle.handle.leafpagerecordsize);
+	fprintf(stdout, "      \"recordsperleafpage\": %zu,\n", ihandle.handle.recordsperleafpage);
+	fprintf(stdout, "      \"firstleafpageoffset\": %zu (%zu),\n", ihandle.handle.firstleafpageoffset, ihandle.handle.firstleafpageoffset / ihandle.handle.pagesize);
+	fprintf(stdout, "      \"valueptrsize\": %zu,\n", ihandle.handle.valueptrsize);
+	fprintf(stdout, "      \"firstvalueoffset\": %zu (%zu),\n", ihandle.handle.firstvalueoffset, ihandle.handle.firstvalueoffset / ihandle.handle.pagesize);
 	puts("      \"perlevel\": [");
 	for (i = ihandle.handle.numlevels; i > 0; i--)
 	{
-		fprintf(stdout, "        {\"level\": %d, \"firstoffset\": %d, \"pages\": %d},\n", i, ihandle.handle.perlevel[i - 1].firstoffset, ihandle.handle.perlevel[i - 1].pages);
+		fprintf(stdout, "        {\"level\": %d, \"firstoffset\": %zu, \"lastoffset\": %zu, \"pages\": %zu},\n", i, ihandle.handle.perlevel[i - 1].firstoffset, ihandle.handle.perlevel[i - 1].lastoffset, ihandle.handle.perlevel[i - 1].pages);
 	}
 	puts("        ]");
 	puts("      }");
@@ -132,10 +132,10 @@ int main(int argc, char *argv[])
 		for (currentpage = 0; currentpage < ihandle.handle.perlevel[i - 1].pages; currentpage++)
 		{
 			offset = currentoffset;
-			fprintf(stdout, "          { [%d, %d]: [\n", currentpage, currentoffset);
+			fprintf(stdout, "          { [%zu, %zu]: [\n", currentpage, currentoffset);
 			for (currentkey = 0; currentkey < ihandle.handle.keyspersearchpage; currentkey++)
 			{
-				fprintf(stdout, "{ %d: \"", currentkey + (currentpage * ihandle.handle.keyspersearchpage));
+				fprintf(stdout, "{ %zu: \"", currentkey + (currentpage * ihandle.handle.keyspersearchpage));
 				while (currentoffset + ihandle.handle.attr.ksize > offset)
 				{
 					if (isprint(*(char*)(ihandle.mmapaddr + offset)))
@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
 				currentoffset = offset;
 				fprintf(stdout, "\"},");
 			}
-			puts("          ]}");
+			fprintf(stdout, "          , [%d, %d]},", currentoffset, ihandle.handle.perlevel[i - 1].lastoffset);
 			currentoffset = ((offset + (ihandle.handle.pagesize - 1)) & ~(ihandle.handle.pagesize - 1));
 		}
 		puts("        ],");
@@ -162,10 +162,10 @@ int main(int argc, char *argv[])
 	for (currentpage = 0; currentpage < ihandle.handle.leafpages; currentpage++)
 	{
 		offset = currentoffset;
-		fprintf(stdout, "      { [%d, %d]: [\n", currentpage, currentoffset);
+		fprintf(stdout, "      { [%zu, %zu]: [\n", currentpage, currentoffset);
 		for (currentkey = 0; currentkey < ihandle.handle.recordsperleafpage; currentkey++)
 		{
-			fprintf(stdout, "{ [%d, %d]: [\"", currentkey + (currentpage * ihandle.handle.recordsperleafpage), currentoffset);
+			fprintf(stdout, "{ [%zu, %zu]: [\"", currentkey + (currentpage * ihandle.handle.recordsperleafpage), currentoffset);
 			while (currentoffset + ihandle.handle.attr.ksize > offset)
 			{
 				if (isprint(*(char*)(ihandle.mmapaddr + offset)))

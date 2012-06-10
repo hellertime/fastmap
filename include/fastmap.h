@@ -39,10 +39,11 @@ typedef struct fastmap_handle_t
 	uint32_t version;
 	struct {
 		size_t firstoffset;
+		size_t lastoffset;
 		size_t pages;
 	} perlevel[FASTMAP_MAXLEVELS];
 	fastmap_attr_t attr;
-	size_t branchingfactor;
+	size_t keyspersearchpage;
 	size_t valueptrsize;
 	size_t recordsperleafpage;
 	size_t leafpages;
@@ -59,10 +60,10 @@ struct fastmap_outhandle_t
 {
 	fastmap_handle_t handle;
 	struct {
-		size_t currentkey;
+		size_t keys;
 		size_t currentoffset;
 	} levelinfo[FASTMAP_MAXLEVELS];
-	size_t currentrecord;
+	size_t records;
 	size_t currentleafpageoffset;
 	size_t currentvalueoffset;
 	int fd;

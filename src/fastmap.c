@@ -13,6 +13,8 @@
 
 #include <fastmap.h>
 
+#define ALIGN_TO_PAGE_OFFSET(v,p) ((v + (p - 1)) & ~(p - 1))
+
 #define FASTMAP_INVALID_MAP	0x01
 #define FASTMAP_INLINE_BLOCK	0x02
 
@@ -148,16 +150,17 @@ int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *a
 
 	ohandle->handle.recordsperleafpage = ohandle->handle.pagesize / ohandle->handle.leafpagerecordsize;
 	ohandle->handle.leafpages = (size_t)ceil((double)ohandle->handle.attr.records / (double)ohandle->handle.recordsperleafpage);
-	ohandle->handle.branchingfactor = ((ohandle->handle.pagesize + ohandle->handle.attr.ksize) / ohandle->handle.attr.ksize);
+	ohandle->handle.keyspersearchpage = ohandle->handle.pagesize / ohandle->handle.attr.ksize;
 
 	ohandle->handle.numlevels = 0;
 	{
 		size_t firstleafpageoffset = ohandle->handle.pagesize;
 		size_t pagesperlevel = ohandle->handle.leafpages;
 		int i;
+
 		while (pagesperlevel > 1)
 		{
-			pagesperlevel = (size_t)ceil((double)pagesperlevel / (double)ohandle->handle.branchingfactor);
+			pagesperlevel = (size_t)ceil((double)pagesperlevel / (double)ohandle->handle.keyspersearchpage);
 			ohandle->handle.perlevel[ohandle->handle.numlevels++].pages = pagesperlevel;
 			firstleafpageoffset += pagesperlevel * ohandle->handle.pagesize;
 			if (ohandle->handle.numlevels > FASTMAP_MAXLEVELS)
@@ -167,7 +170,7 @@ int fastmap_outhandle_init(fastmap_outhandle_t *ohandle, const fastmap_attr_t *a
 			}
 		}
 
-		ohandle->handle.firstleafpageoffset = firstleafpageoffset;
+		ohandle->handle.firstleafpageoffset = firstleafpageoffset + ohandle->handle.pagesize;
 
 		for (i = 0; i < ohandle->handle.numlevels; i++)
 		{
@@ -210,7 +213,7 @@ int fastmap_outhandle_destroy(fastmap_outhandle_t *ohandle)
 		goto success;
 	}
 
-	if (ohandle->currentrecord != ohandle->handle.attr.records)
+	if (ohandle->records != ohandle->handle.attr.records)
 	{
 		rc = FASTMAP_EXPECTATION_FAILED;
 		goto success;
@@ -225,10 +228,37 @@ success:
 	return rc;
 }
 
+static void _updatesearchpagelevels(fastmap_outhandle_t *ohandle, const fastmap_record_t *record, int updateall)
+{
+	int i;
+
+	for (i = 0; i < ohandle->handle.numlevels; i++)
+	{
+		if (ohandle->levelinfo[i].keys % ohandle->handle.keyspersearchpage == 0)
+		{
+			ohandle->levelinfo[i].currentoffset = ALIGN_TO_PAGE_OFFSET(ohandle->levelinfo[i].currentoffset, ohandle->handle.pagesize);
+		}
+	
+		lseek(ohandle->fd, ohandle->levelinfo[i].currentoffset, SEEK_SET);
+		write(ohandle->fd, record->atom.key, ohandle->handle.attr.ksize);
+		ohandle->handle.perlevel[i].lastoffset = ohandle->levelinfo[i].currentoffset;
+		ohandle->levelinfo[i].currentoffset += ohandle->handle.attr.ksize;
+		ohandle->levelinfo[i].keys++;
+
+		if ((ohandle->levelinfo[i].keys < ohandle->handle.keyspersearchpage) || (ohandle->levelinfo[i].keys % ohandle->handle.keyspersearchpage != 1) || updateall)
+			break;
+	}
+}
+
 int fastmap_outhandle_put(fastmap_outhandle_t *ohandle, const fastmap_record_t *record)
 {
-	if ((ohandle->currentrecord + 1) > ohandle->handle.attr.records)
+	if ((ohandle->records + 1) > ohandle->handle.attr.records)
 		return FASTMAP_TOO_MANY_RECORDS;
+
+	if ((ohandle->records % ohandle->handle.recordsperleafpage) == 0)
+	{
+		ohandle->currentleafpageoffset = ALIGN_TO_PAGE_OFFSET(ohandle->currentleafpageoffset, ohandle->handle.pagesize);
+	}
 
 	lseek(ohandle->fd, ohandle->currentleafpageoffset, SEEK_SET);
 	write(ohandle->fd, record->atom.key, ohandle->handle.attr.ksize);
@@ -264,37 +294,13 @@ int fastmap_outhandle_put(fastmap_outhandle_t *ohandle, const fastmap_record_t *
 		break;
 	}
 
-#define ALIGN_TO_NEXT_PAGE(v,p) ((v + (p - 1)) & ~(p - 1))
+	ohandle->records++;
 
-	if ((ohandle->currentrecord != 0) && (ohandle->currentrecord % ohandle->handle.recordsperleafpage) == 0)
 	{
-		int i;
-
-		for (i = 0; i < ohandle->handle.numlevels; i++)
-		{
-			if (ohandle->levelinfo[i].currentkey % (ohandle->handle.branchingfactor - 1) == 0)
-			{
-				ohandle->levelinfo[i].currentoffset = ALIGN_TO_NEXT_PAGE(ohandle->levelinfo[i].currentoffset, ohandle->handle.pagesize);
-			}
-		
-			lseek(ohandle->fd, ohandle->levelinfo[i].currentoffset, SEEK_SET);
-			write(ohandle->fd, record->atom.key, ohandle->handle.attr.ksize);
-			ohandle->levelinfo[i].currentoffset += ohandle->handle.attr.ksize;
-			ohandle->levelinfo[i].currentkey++;
-
-			if (ohandle->levelinfo[i].currentkey % (ohandle->handle.branchingfactor - 1) != 0)
-				break;
-		}
+		int updateall = (ohandle->records == ohandle->handle.attr.records);
+		if (updateall || ((ohandle->records > ohandle->handle.recordsperleafpage) && (ohandle->records % ohandle->handle.recordsperleafpage == 1)))
+			_updatesearchpagelevels(ohandle, record, updateall);
 	}
-
-	ohandle->currentrecord++;
-
-	if ((ohandle->currentrecord % ohandle->handle.recordsperleafpage) == 0)
-	{
-		ohandle->currentleafpageoffset = ALIGN_TO_NEXT_PAGE(ohandle->currentleafpageoffset, ohandle->handle.pagesize);
-	}
-
-#undef ALIGN_TO_NEXT_PAGE
 
 	return FASTMAP_OK;
 }
@@ -384,40 +390,61 @@ int fastmap_inhandle_setcmpfunc(fastmap_inhandle_t *ihandle, fastmap_cmpfunc cmp
 int fastmap_inhandle_get(fastmap_inhandle_t *ihandle, fastmap_record_t *record)
 {
 	size_t currentkey;
+	size_t leveloffset;
 	size_t recordindex;
 	size_t offset;
 	int currentlevel;
 
-	currentlevel = ihandle->handle.numlevels;
-	offset = ihandle->handle.pagesize;
-	while (currentlevel > 0)
+	if (ihandle->handle.numlevels == 0)
 	{
-		for (currentkey = 0; currentkey < ihandle->handle.branchingfactor; currentkey++)
+		offset = ihandle->handle.firstleafpageoffset;
+	}
+	else
+	{
+		currentlevel = ihandle->handle.numlevels;
+		offset = ihandle->handle.perlevel[currentlevel - 1].firstoffset;
+		while (currentlevel > 0)
 		{
-			int ord = ihandle->cmp(&ihandle->handle.attr, record->atom.key, (char*)ihandle->mmapaddr + offset);
-			if (ord > 0)
+restartlevel:
+			for (currentkey = 0; currentkey < ihandle->handle.keyspersearchpage; currentkey++)
 			{
-				offset += ihandle->handle.attr.ksize;
-			}
-			else
-			{
-				if (currentlevel == 1)
+				int ord = ihandle->cmp(&ihandle->handle.attr, record->atom.key, (char*)ihandle->mmapaddr + offset);
+				if (ord > 0)
 				{
-					offset = ihandle->handle.firstleafpageoffset;
+					offset += ihandle->handle.attr.ksize;
+					if (offset == ihandle->handle.perlevel[currentlevel - 1].lastoffset)
+						goto movetonextlevel;
+
+					if (currentkey + 1 == ihandle->handle.keyspersearchpage)
+					{
+						offset = ALIGN_TO_PAGE_OFFSET(offset, ihandle->handle.pagesize);
+						goto restartlevel;
+					}
 				}
 				else
 				{
-					offset = ihandle->handle.perlevel[currentlevel - 1].firstoffset;
-				}
+movetonextlevel:
+					leveloffset = ((offset - ihandle->handle.perlevel[currentlevel - 1].firstoffset) / ihandle->handle.pagesize);
+					if (currentlevel == 1)
+					{
+						leveloffset *= ihandle->handle.recordsperleafpage * ihandle->handle.pagesize;
+						offset = ihandle->handle.firstleafpageoffset; 
+					}
+					else
+					{
+						leveloffset *= ihandle->handle.keyspersearchpage * ihandle->handle.pagesize;
+						offset = ihandle->handle.perlevel[currentlevel - 2].firstoffset;
+					}
 
-				offset += ((ord < 0) ? currentkey : (currentkey + 1)) * ihandle->handle.pagesize;
-				break;
+					offset +=  leveloffset + ((ord < 0) ? currentkey : (currentkey + 1)) * ihandle->handle.pagesize;
+					break;
+				}
 			}
+			currentlevel--;
 		}
-		currentlevel--;
 	}
 
-	recordindex = ((offset - ihandle->handle.firstleafpageoffset) / ihandle->handle.pagesize) / ihandle->handle.recordsperleafpage;
+	recordindex = ((offset - ihandle->handle.firstleafpageoffset) / ihandle->handle.pagesize) * ihandle->handle.recordsperleafpage;
 
 	for (currentkey = 0; currentkey < ihandle->handle.recordsperleafpage; currentkey++)
 	{
