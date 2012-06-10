@@ -81,6 +81,7 @@ int main(void)
 	ok(fastmap_inhandle_destroy(&ihandle) == FASTMAP_OK, "closed fastmap");
 
 	unlink(pathname);
+	free(pathname);
 
 	done_testing();
 }
