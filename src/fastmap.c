@@ -424,15 +424,13 @@ restartlevel:
 				else
 				{
 movetonextlevel:
-					leveloffset = ((offset - ihandle->handle.perlevel[currentlevel - 1].firstoffset) / ihandle->handle.pagesize);
+					leveloffset = ((offset - ihandle->handle.perlevel[currentlevel - 1].firstoffset) / ihandle->handle.pagesize) * (ihandle->handle.keyspersearchpage * ihandle->handle.pagesize);
 					if (currentlevel == 1)
 					{
-						leveloffset *= ihandle->handle.recordsperleafpage * ihandle->handle.pagesize;
 						offset = ihandle->handle.firstleafpageoffset; 
 					}
 					else
 					{
-						leveloffset *= ihandle->handle.keyspersearchpage * ihandle->handle.pagesize;
 						offset = ihandle->handle.perlevel[currentlevel - 2].firstoffset;
 					}
 

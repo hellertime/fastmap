@@ -15,14 +15,14 @@ int main(void)
 	fastmap_inhandle_t ihandle;
 	fastmap_outhandle_t ohandle;
 	int i, seen_anything_but_success;
-	char buf[33], buf2[33], *pathname = tempnam(NULL, "fm1Ma");
+	char buf[33], buf2[33], *pathname = tempnam(NULL, "fm1Mp");
 
 	plan(26);
 
 	fastmap_attr_init(&attr);
 	fastmap_attr_setrecords(&attr, 1000000);
 	fastmap_attr_setksize(&attr, 32);
-	fastmap_attr_setformat(&attr, FASTMAP_ATOM);
+	fastmap_attr_setformat(&attr, FASTMAP_PAIR);
 
 	ok(fastmap_outhandle_init(&ohandle, &attr, pathname) == FASTMAP_OK, "created fastmap");
 
