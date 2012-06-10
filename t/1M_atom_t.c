@@ -16,8 +16,6 @@ int main(void)
 	int i, seen_anything_but_success;
 	char buf[33], *pathname = tempnam(NULL, "fm1Ma");
 
-	srand(86243);
-
 	plan(26);
 
 	fastmap_attr_init(&attr);
