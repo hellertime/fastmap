@@ -23,7 +23,7 @@ int main(void)
 	fastmap_attr_setrecords(&attr, 1000000);
 	fastmap_attr_setksize(&attr, 32);
 	fastmap_attr_setvsize(&attr, 29);
-	fastmap_attr_setformat(&attr, FASTMAP_ATOM);
+	fastmap_attr_setformat(&attr, FASTMAP_BLOCK);
 
 	ok(fastmap_outhandle_init(&ohandle, &attr, pathname) == FASTMAP_OK, "created fastmap");
 
@@ -33,7 +33,7 @@ int main(void)
 	{
 		sprintf(buf, "<<<<----%016d---->>>>", i);
 		block.key = buf;
-		sprintf(buf2, ">>>--%016d---<<<<", i);
+		sprintf(buf2, ">>>---%016d---<<<<", i);
 		block.value = buf2;
 		if (fastmap_outhandle_put(&ohandle, (fastmap_record_t*)&block) != FASTMAP_OK && !seen_anything_but_success)
 		{
@@ -58,14 +58,14 @@ int main(void)
 	{
 		sprintf(buf, "<<<<----%016d---->>>>", i);
 		block.key = buf;
-		sprintf(buf2, ">>>--%016d----<<<<", i);
+		sprintf(buf2, ">>>---%016d---<<<<", i);
 		if (fastmap_inhandle_get(&ihandle, (fastmap_record_t*)&block) != FASTMAP_OK && !seen_anything_but_success)
 		{
 			seen_anything_but_success = 1;
 			diag("unable to get key: '%016d'", i);
 		}
 
-		if (strncmp(block.value, buf2, ihandle.handle.attr.ksize) != 0 && !seen_anything_but_success)
+		if (strncmp(block.value, buf2, ihandle.handle.attr.vsize) != 0 && !seen_anything_but_success)
 		{
 			seen_anything_but_success = 1;
 			diag("value mismatch for key: '%016d'", i);

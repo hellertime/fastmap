@@ -23,7 +23,7 @@ int main(void)
 	fastmap_attr_setrecords(&attr, 1000000);
 	fastmap_attr_setksize(&attr, 32);
 	fastmap_attr_setvsize(&attr, 32);
-	fastmap_attr_setformat(&attr, FASTMAP_ATOM);
+	fastmap_attr_setformat(&attr, FASTMAP_BLOCK);
 
 	ok(fastmap_outhandle_init(&ohandle, &attr, pathname) == FASTMAP_OK, "created fastmap");
 
