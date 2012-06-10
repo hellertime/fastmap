@@ -13,15 +13,41 @@ fastmap(3) -- library routines for fastmap files
 
 ```c
 #include <fastmap.h>
+```
 
+### Creating a fastmap
+
+```c
 fastmap_attr_t attr;
 fastmap_outhandle_t out;
 
-status = fastmap_outhandle_init(&out, &attr, "/path/to/new/fastmap");
+fastmap_atom_t atoms[] = { 1, 2, 3, ..., 999999 };
 
+fastmap_attr_init(&attr);
+fastmap_attr_setformat(&attr, FASTMAP_ATOM);
+fastmap_attr_setrecords(&attr, sizeof(atoms) / sizeof(atoms[0]));
+fastmap_attr_setksize(&attr, sizeof(atoms[0]));
+
+fastmap_outhandle_init(&out, &attr, "/a/fastmap");
+
+for (int i = 0; i < sizeof(atoms) / sizeof(atoms[0]); i++)
+  fastmap_outhandle_put(&out, (fastmap_record_t*)&atoms[i]);
+
+fastmap_outhandle_destory(&out);
+```
+
+### Querying a fastmap
+
+```c
+fastmap_atom_t atom;
 fastmap_inhandle_t in;
 
-status = fastmap_inhandle_init(&in, "/path/to/existing/fastmap");
+fastmap_inhandle_init(&in, "/a/fastmap");
+
+atom.key = 16631;
+assert(fastmap_inhandle_get(&in, &atom) == FASTMAP_OK);
+
+fastmap_inhandle_destroy(&in);
 ```
 
 ## DESCRIPTION
