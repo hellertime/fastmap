@@ -37,7 +37,7 @@ fastmap will be created:
 
   * The size of a key.
 
-  * The fastmap format (see [FORMATS][]).
+  * The fastmap format (see [FORMATS][FORMATS]).
 
 ### Fastmap function return values
 
