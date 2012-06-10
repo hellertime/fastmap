@@ -62,6 +62,8 @@ various benefits and trade-offs to the user.
 
 There are four formats supported:
 
+[FORMATS]:
+
   * `FASTMAP_ATOM` this is a degenerate key-value format, where the key is the value.
 
   * `FASTMAP_PAIR` this is a fixed size key-value format, where the key size and
