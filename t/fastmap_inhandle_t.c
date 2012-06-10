@@ -48,7 +48,7 @@ int main(void)
 	}
 
 	atom.key = "0006";
-	ok(fastmap_outhandle_put(&ohandle, (fastmap_record_t*)&atom) == FASTMAP_TOO_MANY_RECORDS, "fastmap_outhandle_put() == TOO_MANY_recordS");
+	ok(fastmap_outhandle_put(&ohandle, (fastmap_record_t*)&atom) == FASTMAP_TOO_MANY_RECORDS, "fastmap_outhandle_put() == TOO_MANY_RECORDS");
 
 	fastmap_outhandle_destroy(&ohandle);
 
