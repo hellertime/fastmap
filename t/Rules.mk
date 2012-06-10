@@ -6,7 +6,8 @@ check_PROGRAMS += \
 	t/fastmap_block_t \
 	t/fastmap_block_inline_t \
 	t/fastmap_blob_t \
-	t/1M_atom_t
+	t/1M_atom_t \
+	t/1M_pair_t
 
 t_fastmap_attr_t_SOURCES = t/fastmap_attr_t.c
 t_fastmap_attr_t_LDADD = libtap.a src/libfastmap.la
@@ -31,3 +32,6 @@ t_fastmap_blob_t_LDADD = libtap.a src/libfastmap.la
 
 t_1M_atom_t_SOURCES = t/1M_atom_t.c
 t_1M_atom_t_LDADD = libtap.a src/libfastmap.la
+
+t_1M_pair_t_SOURCES = t/1M_pair_t.c
+t_1M_pair_t_LDADD = libtap.a src/libfastmap.la
