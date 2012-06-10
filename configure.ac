@@ -36,6 +36,25 @@ AC_PROG_LIBTOOL
 CFLAGS="-g -ggdb -O0"
 
 ##
+# Provide a valgrind test target on request
+use_valgrind=false
+AC_ARG_ENABLE(valgrind,
+[  --enable-valgrind       Use valgrind when running test suite. ],
+[ use_valgrind=true ])
+
+if [[ "x$use_valgrind" = "xtrue" ]]
+then
+	AC_CHECK_PROG(HAVE_VALGRIND, valgrind, yes, no)
+
+	if [[ "x$HAVE_VALGRIND" = "xno" ]]
+	then
+		AC_MSG_ERROR([ Valgrind not found in PATH. ])
+	fi
+fi
+
+AM_CONDITIONAL(USE_VALGRIND, $use_valgrind)
+
+##
 # Normalize integer types as best as we can
 AC_CHECK_HEADERS(inttypes.h stdint.h)
 

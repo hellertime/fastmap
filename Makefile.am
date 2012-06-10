@@ -25,6 +25,10 @@ libtap_a_CPPFLAGS = $(AM_CFLAGS) -Wall
 include src/Rules.mk
 include t/Rules.mk
 
+if USE_VALGRIND
+TESTS_ENVIRONMENT=$(top_srcdir)/meta-util/valgrind-wrapper.sh
+endif
+
 TESTS = $(check_PROGRAMS)
 
 really-clean: maintainer-clean
