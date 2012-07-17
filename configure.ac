@@ -1,6 +1,7 @@
 ##
 # libfastmap Autoconf script
-# # Author: Chris Heller <hellertime@gmail.com>
+# 
+# Author: Chris Heller <hellertime@gmail.com>
 #
 
 AC_INIT([Fastmap Library],[0.9.0],[hellertime@gmail.com],[libfastmap])
