@@ -34,7 +34,21 @@ AM_PROG_AR
 
 AC_PROG_LIBTOOL
 
-CFLAGS="-g -ggdb -O0"
+##
+# Enable compiler optimizations if desired
+use_optimizers=false
+AC_ARG_ENABLE(optimization,
+[  --enable-optimization   Use compiler optimizations during build. ],
+[ use_optimizers=true ])
+
+if [[ "x$use_optimizers" = "xtrue" ]]
+then
+	CFLAGS="-Ofast"
+else
+	CFLAGS="-g -ggdb -O0"
+fi
+
+AM_CONDITIONAL(USE_OPTIMIZERS, $use_optimizers)
 
 ##
 # Provide a valgrind test target on request
