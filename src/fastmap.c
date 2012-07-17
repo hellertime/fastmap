@@ -387,62 +387,9 @@ int fastmap_inhandle_setcmpfunc(fastmap_inhandle_t *ihandle, fastmap_cmpfunc cmp
 	return FASTMAP_OK;
 }
 
-int fastmap_inhandle_get(fastmap_inhandle_t *ihandle, fastmap_record_t *record)
+static int _leafpage_get(fastmap_inhandle_t *ihandle, fastmap_record_t *record, size_t offset, size_t recordindex)
 {
 	size_t currentkey;
-	size_t leveloffset;
-	size_t recordindex;
-	size_t offset;
-	int currentlevel;
-
-	if (ihandle->handle.numlevels == 0)
-	{
-		offset = ihandle->handle.firstleafpageoffset;
-	}
-	else
-	{
-		currentlevel = ihandle->handle.numlevels;
-		offset = ihandle->handle.perlevel[currentlevel - 1].firstoffset;
-		while (currentlevel > 0)
-		{
-restartlevel:
-			for (currentkey = 0; currentkey < ihandle->handle.keyspersearchpage; currentkey++)
-			{
-				int ord = ihandle->cmp(&ihandle->handle.attr, record->atom.key, (char*)ihandle->mmapaddr + offset);
-				if (ord > 0)
-				{
-					offset += ihandle->handle.attr.ksize;
-					if (offset == ihandle->handle.perlevel[currentlevel - 1].lastoffset)
-						goto movetonextlevel;
-
-					if (currentkey + 1 == ihandle->handle.keyspersearchpage)
-					{
-						offset = ALIGN_TO_PAGE_OFFSET(offset, ihandle->handle.pagesize);
-						goto restartlevel;
-					}
-				}
-				else
-				{
-movetonextlevel:
-					leveloffset = ((offset - ihandle->handle.perlevel[currentlevel - 1].firstoffset) / ihandle->handle.pagesize) * (ihandle->handle.keyspersearchpage * ihandle->handle.pagesize);
-					if (currentlevel == 1)
-					{
-						offset = ihandle->handle.firstleafpageoffset; 
-					}
-					else
-					{
-						offset = ihandle->handle.perlevel[currentlevel - 2].firstoffset;
-					}
-
-					offset +=  leveloffset + ((ord < 0) ? currentkey : (currentkey + 1)) * ihandle->handle.pagesize;
-					break;
-				}
-			}
-			currentlevel--;
-		}
-	}
-
-	recordindex = ((offset - ihandle->handle.firstleafpageoffset) / ihandle->handle.pagesize) * ihandle->handle.recordsperleafpage;
 
 	for (currentkey = 0; currentkey < ihandle->handle.recordsperleafpage; currentkey++)
 	{
@@ -483,4 +430,61 @@ movetonextlevel:
 	}
 
 	return FASTMAP_NOT_FOUND;
+}
+
+int fastmap_inhandle_get(fastmap_inhandle_t *ihandle, fastmap_record_t *record)
+{
+	size_t recordindex;
+	size_t offset;
+	size_t currentpage, currentkey;
+	int currentlevel, ord;
+
+	if (ihandle->handle.numlevels == 0)
+	{
+		offset = ihandle->handle.firstleafpageoffset;
+	}
+	else
+	{
+		currentlevel = ihandle->handle.numlevels;
+		offset = ihandle->handle.perlevel[currentlevel - 1].firstoffset;
+		currentpage = 0;
+		while (currentlevel > 0)
+		{
+			while (currentpage < ihandle->handle.perlevel[currentlevel - 1].pages)
+			{
+				for (currentkey = 0; currentkey < ihandle->handle.keyspersearchpage; currentkey++)
+				{
+					ord = ihandle->cmp(&ihandle->handle.attr, record->atom.key, (char*)ihandle->mmapaddr + offset);
+
+					if (ord > 0)
+					{
+						offset += ihandle->handle.attr.ksize;
+						continue;
+					}
+					else
+					{
+						currentpage = (currentpage + 1) * ihandle->handle.keyspersearchpage + currentkey;
+						if (currentlevel == 1)
+						{
+							offset = ihandle->handle.firstleafpageoffset;
+						}
+						else
+						{
+							offset = ihandle->handle.perlevel[currentlevel - 2].firstoffset;
+						}
+						offset += currentpage * ihandle->handle.pagesize;
+						goto NEXT_LEVEL;
+					}
+				}
+				offset = ALIGN_TO_PAGE_OFFSET(offset, ihandle->handle.pagesize);
+				currentpage++;
+			}
+NEXT_LEVEL:
+			currentlevel--;
+		}
+	}
+
+	recordindex = ((offset - ihandle->handle.firstleafpageoffset) / ihandle->handle.pagesize) * ihandle->handle.recordsperleafpage;
+
+	return _leafpage_get(ihandle, record, offset, recordindex);
 }
