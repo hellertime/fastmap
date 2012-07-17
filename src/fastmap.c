@@ -228,7 +228,7 @@ success:
 	return rc;
 }
 
-static void _updatesearchpagelevels(fastmap_outhandle_t *ohandle, const fastmap_record_t *record, int updateall)
+static void _updatesearchpagelevels(fastmap_outhandle_t *ohandle, const fastmap_record_t *record)
 {
 	int i;
 
@@ -245,7 +245,7 @@ static void _updatesearchpagelevels(fastmap_outhandle_t *ohandle, const fastmap_
 		ohandle->levelinfo[i].currentoffset += ohandle->handle.attr.ksize;
 		ohandle->levelinfo[i].keys++;
 
-		if ((ohandle->levelinfo[i].keys < ohandle->handle.keyspersearchpage) || (ohandle->levelinfo[i].keys % ohandle->handle.keyspersearchpage != 1) || updateall)
+		if ((ohandle->levelinfo[i].keys < ohandle->handle.keyspersearchpage) || (ohandle->levelinfo[i].keys % ohandle->handle.keyspersearchpage != 1))
 			break;
 	}
 }
@@ -297,9 +297,8 @@ int fastmap_outhandle_put(fastmap_outhandle_t *ohandle, const fastmap_record_t *
 	ohandle->records++;
 
 	{
-		int updateall = (ohandle->records == ohandle->handle.attr.records);
-		if (updateall || ((ohandle->records > ohandle->handle.recordsperleafpage) && (ohandle->records % ohandle->handle.recordsperleafpage == 1)))
-			_updatesearchpagelevels(ohandle, record, updateall);
+		if ((ohandle->records > ohandle->handle.recordsperleafpage) && (ohandle->records % ohandle->handle.recordsperleafpage == 1))
+			_updatesearchpagelevels(ohandle, record);
 	}
 
 	return FASTMAP_OK;
@@ -456,14 +455,20 @@ int fastmap_inhandle_get(fastmap_inhandle_t *ihandle, fastmap_record_t *record)
 				{
 					ord = ihandle->cmp(&ihandle->handle.attr, record->atom.key, (char*)ihandle->mmapaddr + offset);
 
-					if (ord > 0)
+					if (ord > 0 && offset != ihandle->handle.perlevel[currentlevel - 1].lastoffset)
 					{
 						offset += ihandle->handle.attr.ksize;
 						continue;
 					}
 					else
 					{
-						currentpage = (currentpage + 1) * ihandle->handle.keyspersearchpage + currentkey;
+						currentpage = (currentpage * ihandle->handle.keyspersearchpage) + currentkey;
+
+						if (ord >= 0)
+						{
+							currentpage++;
+						}
+
 						if (currentlevel == 1)
 						{
 							offset = ihandle->handle.firstleafpageoffset;
