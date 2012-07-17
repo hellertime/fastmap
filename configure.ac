@@ -3,7 +3,7 @@
 # # Author: Chris Heller <hellertime@gmail.com>
 #
 
-AC_INIT([Fastmap Library],[0.0.1],[hellertime@gmail.com],[libfastmap])
+AC_INIT([Fastmap Library],[0.9.0],[hellertime@gmail.com],[libfastmap])
 
 # Configure Autoconf
 AC_CONFIG_AUX_DIR([build-aux])
