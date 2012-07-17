@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
 			fprintf(stdout, "          { [%zu, %zu]: [\n", currentpage, currentoffset);
 			for (currentkey = 0; currentkey < ihandle.handle.keyspersearchpage; currentkey++)
 			{
-				fprintf(stdout, "{ %zu: \"", currentkey + (currentpage * ihandle.handle.keyspersearchpage));
+				fprintf(stdout, "{ [%zu, %zu]: \"", currentkey + (currentpage * ihandle.handle.keyspersearchpage), currentoffset);
 				while (currentoffset + ihandle.handle.attr.ksize > offset)
 				{
 					if (isprint(*(char*)(ihandle.mmapaddr + offset)))
