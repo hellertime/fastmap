@@ -1,4 +1,6 @@
+before_install: sudo apt-get install -y libtest-differences-perl
 install: sh bootstrap.sh
+after_install: make uninstall 
 language: c
 compiler: gcc
-script: ./configure && make && make check
+script: sh configure && make && make check_PROGRAMS && prove && make dist-check
