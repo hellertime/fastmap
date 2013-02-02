@@ -1,2 +1,3 @@
+install: sh botstrap.sh
 language: c
 compiler: gcc
