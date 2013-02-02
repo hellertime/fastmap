@@ -4,4 +4,4 @@ after_install: make uninstall
 language: c
 compiler: gcc
 env: TESTS_ENVIRONMENT=true XFAIL_TESTS=
-script: sh configure && make && make check_PROGRAMS && prove && make dist-check
+script: sh configure && make && make check && prove && make dist-check
