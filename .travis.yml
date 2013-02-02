@@ -1,3 +1,4 @@
 install: sh bootstrap.sh
 language: c
 compiler: gcc
+script: ./configure && make && make check
