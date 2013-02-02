@@ -1,7 +1,6 @@
 before_install: sudo apt-get install -y libtest-differences-perl
-install: sh bootstrap.sh
-after_install: make uninstall 
+install: sh bootstrap.sh && sh configure && make && make check
 language: c
 compiler: gcc
 env: TESTS_ENVIRONMENT=true XFAIL_TESTS=
-script: sh configure && make && make check && prove && make dist-check
+script: prove && make dist-check
