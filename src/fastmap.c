@@ -392,6 +392,7 @@ static int _leafpage_get(fastmap_inhandle_t *ihandle, fastmap_record_t *record, 
 
 	for (currentkey = 0; currentkey < ihandle->handle.recordsperleafpage; currentkey++)
 	{
+/* TODO: _get() does a lot of comparisons. Can this be converted from a linear scan of the page to a binary search? will it conflict with non-multiple inline blocks? */
 		int ord = ihandle->cmp(&ihandle->handle.attr, record->atom.key, (char*)ihandle->mmapaddr + offset);
 
 		if (ord > 0)
