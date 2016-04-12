@@ -1,7 +1,7 @@
 addons:
   apt:
     packages:
-    - libtest-differences-perl
+      - libtest-differences-perl
 install: sh bootstrap.sh && sh configure && make && make check TESTS_ENVIRONMENT=true XFAIL_TESTS=
 language: c
 compiler:
